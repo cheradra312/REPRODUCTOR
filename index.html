@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Herramienta de Lectura de Texto Avanzada con IA</title>
+    <title>Herramienta de Lectura de Texto Avanzada</title>
     <!-- Tailwind CSS para un diseño moderno -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Iconos de Font Awesome -->
@@ -72,48 +72,6 @@
             from { transform: scale(1); opacity: 1; }
             to { transform: scale(1.2); opacity: 0.8; }
         }
-        #ai-modal-content .keyword-card {
-            background-color: #f3f4f6;
-            border-left: 4px solid #3b82f6;
-            padding: 0.75rem 1rem;
-            margin-bottom: 0.75rem;
-            border-radius: 0.25rem;
-        }
-        #ai-modal-content .keyword-card h4 {
-            font-weight: 700;
-            color: #1e3a8a;
-            margin-bottom: 0.25rem;
-        }
-        #ai-modal-content .mind-map ul {
-            list-style: none;
-            padding-left: 1.5rem;
-            position: relative;
-        }
-        #ai-modal-content .mind-map li {
-            position: relative;
-            padding: 0.25rem 0 0.25rem 1.25rem;
-            border-left: 2px solid #d1d5db;
-        }
-        #ai-modal-content .mind-map li::before {
-            content: '';
-            position: absolute;
-            top: 0.8rem;
-            left: -2px;
-            border-top: 2px solid #d1d5db;
-            width: 1rem;
-            height: 0;
-        }
-        #ai-modal-content .mind-map li:last-child {
-            border-left: none;
-        }
-         #ai-modal-content .mind-map li:last-child::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -2px;
-            border-left: 2px solid #d1d5db;
-            height: 0.8rem;
-         }
     </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
@@ -161,8 +119,15 @@
                     <option value="1">1 vez</option>
                     <option value="2">2 veces</option>
                     <option value="3">3 veces</option>
+                    <!-- MODIFICACIÓN: Se añaden nuevas opciones de repetición -->
+                    <option value="4">4 veces</option>
+                    <option value="5">5 veces</option>
                 </select>
             </div>
+             <!-- MODIFICACIÓN: Se añade el botón de bucle -->
+            <button id="loop-btn" title="Repetir en bucle" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center transition-colors">
+                <i class="fas fa-sync-alt"></i>
+            </button>
              <div class="flex items-center gap-2">
                 <label class="text-sm font-medium text-gray-700">Velocidad:</label>
                 <button id="speed-down-btn" title="Disminuir Velocidad" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center" disabled><i class="fas fa-minus"></i></button>
@@ -172,18 +137,7 @@
              <button id="toggle-text-display-size" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center" title="Expandir Texto">
                <i class="fas fa-expand-alt"></i>
             </button>
-            <div class="relative" id="ai-tools-dropdown">
-                <button id="ai-tools-toggle" class="bg-blue-50 hover:bg-blue-100 text-blue-800 font-bold py-2 px-4 rounded-full flex items-center gap-2 transition-colors shadow-sm">
-                    <span>✨ Herramientas IA</span>
-                    <i class="fas fa-chevron-down transition-transform"></i>
-                </button>
-                <div id="ai-tools-menu" class="hidden absolute bottom-full mb-2 w-56 bg-white rounded-lg shadow-xl border">
-                     <button id="summarize-btn" class="w-full text-left text-gray-700 hover:bg-gray-100 py-2 px-4 flex items-center gap-3"><i class="fas fa-compress-arrows-alt w-5 text-center"></i>Resumir Epígrafe</button>
-                     <button id="keywords-btn" class="w-full text-left text-gray-700 hover:bg-gray-100 py-2 px-4 flex items-center gap-3"><i class="fas fa-key w-5 text-center"></i>Palabras Clave</button>
-                     <button id="mindmap-btn" class="w-full text-left text-gray-700 hover:bg-gray-100 py-2 px-4 flex items-center gap-3"><i class="fas fa-sitemap w-5 text-center"></i>Mapa Mental</button>
-                     <button id="explain-btn" class="w-full text-left text-gray-700 hover:bg-gray-100 py-2 px-4 flex items-center gap-3"><i class="fas fa-lightbulb w-5 text-center"></i>Explicar Párrafo</button>
-                </div>
-            </div>
+            <!-- MODIFICACIÓN: Se elimina el botón y menú de Herramientas IA -->
         </div>
         
         <div id="reader-status-container" class="flex items-center justify-center mb-4 min-h-[20px]">
@@ -196,16 +150,6 @@
         </div>
     </div>
     
-    <div id="ai-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-lg shadow-xl w-11/12 max-w-2xl max-h-[90vh] flex flex-col">
-            <div class="flex justify-between items-center p-4 border-b">
-                <h3 id="ai-modal-title" class="text-xl font-bold text-gray-800">Respuesta de la IA</h3>
-                <button id="ai-modal-close" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
-            </div>
-            <div id="ai-modal-content" class="p-6 overflow-y-auto"></div>
-        </div>
-    </div>
-
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             const DEBUG = true;
@@ -234,22 +178,12 @@
             const speedDownBtn = document.getElementById('speed-down-btn');
             const currentSpeedDisplay = document.getElementById('current-speed-display');
             const toggleTextDisplaySizeBtn = document.getElementById('toggle-text-display-size');
-            
-            const aiToolsToggle = document.getElementById('ai-tools-toggle');
-            const aiToolsMenu = document.getElementById('ai-tools-menu');
-            const summarizeBtn = document.getElementById('summarize-btn');
-            const keywordsBtn = document.getElementById('keywords-btn');
-            const mindmapBtn = document.getElementById('mindmap-btn');
-            const explainBtn = document.getElementById('explain-btn');
-            const aiModal = document.getElementById('ai-modal');
-            const aiModalTitle = document.getElementById('ai-modal-title');
-            const aiModalContent = document.getElementById('ai-modal-content');
-            const aiModalClose = document.getElementById('ai-modal-close');
+            const loopBtn = document.getElementById('loop-btn');
 
             let temarioDoc = null;
             let paragraphs = [];
             let lastHighlightedSpan = null;
-            let lastHighlightedParagraph = null; // Para resaltar el párrafo completo
+            let lastHighlightedParagraph = null;
             let voices = [];
             let voicesReady = false;
             let utterance = null;
@@ -258,6 +192,7 @@
             let isPaused = false;
             let stopRequested = false;
             let seekInProgress = false;
+            let isLooping = false; // MODIFICACIÓN: Nueva variable de estado para el bucle
             
             let currentParagraphIndex = 0;
             let currentRepetition = 0;
@@ -343,6 +278,16 @@
             speedDownBtn.addEventListener('click', decreaseSpeed);
             toggleTextDisplaySizeBtn.addEventListener('click', toggleTextDisplaySize);
             
+            // MODIFICACIÓN: Event listener para el botón de bucle
+            loopBtn.addEventListener('click', () => {
+                isLooping = !isLooping;
+                loopBtn.classList.toggle('bg-blue-600', isLooping);
+                loopBtn.classList.toggle('text-white', isLooping);
+                loopBtn.classList.toggle('bg-gray-200', !isLooping);
+                loopBtn.classList.toggle('text-gray-700', !isLooping);
+                log('Modo bucle:', isLooping ? 'Activado' : 'Desactivado');
+            });
+
             function updateEpigrafeSelect() {
                 stopReadingInternal(true);
                 const topicId = topicSelect.value;
@@ -373,7 +318,6 @@
                 prepareAndDisplayText();
             }
 
-            // CORRECCIÓN: Lógica mejorada para manejar listas y otros elementos.
             function prepareAndDisplayText(selectionChanged = false) {
                 if (selectionChanged) {
                     stopReadingInternal(true);
@@ -391,7 +335,6 @@
                 let pIndex = 0;
                 elements.forEach(el => {
                     if (el.tagName === 'UL' || el.tagName === 'OL') {
-                        // Si es una lista, procesa cada elemento `<li>` individualmente.
                         Array.from(el.children).forEach(li => {
                             const liContent = li.textContent.trim();
                             if(liContent.length > 0) {
@@ -400,7 +343,6 @@
                             }
                         });
                     } else {
-                        // Para cualquier otro elemento (p, h2, h3, etc.)
                         const content = el.textContent.trim();
                         if (content.length > 0) {
                             paragraphs.push({ text: content, tagName: el.tagName });
@@ -550,9 +492,17 @@
                 }
 
                 if (currentParagraphIndex >= paragraphs.length) {
-                    log('Se ha llegado al final del temario.');
-                    stopReadingInternal(true);
-                    readerStatus.textContent = "Lectura completada.";
+                    // MODIFICACIÓN: Lógica de bucle
+                    if(isLooping) {
+                        log('Fin de la selección, reiniciando en bucle.');
+                        currentParagraphIndex = 0;
+                        currentRepetition = 0;
+                        setTimeout(() => playCurrentParagraph(), 50);
+                    } else {
+                        log('Se ha llegado al final del temario.');
+                        stopReadingInternal(true);
+                        readerStatus.textContent = "Lectura completada.";
+                    }
                     return;
                 }
                 
@@ -767,108 +717,6 @@
                     lastHighlightedParagraph = null;
                  }
                  updateUIState('idle');
-            }
-            
-            // --- Lógica de la API de Gemini ---
-            aiToolsToggle.addEventListener('click', () => {
-                aiToolsMenu.classList.toggle('hidden');
-                aiToolsToggle.querySelector('i').classList.toggle('rotate-180');
-            });
-            
-            summarizeBtn.addEventListener('click', () => {
-                const text = getFullEpigrafeText();
-                if (text) {
-                    const prompt = `Resume el siguiente texto del temario en 3 puntos clave, como si fueran notas de estudio:\n\n---\n${text}\n---`;
-                    callGemini(prompt, "✨ Resumen del Epígrafe", 'text');
-                }
-            });
-
-            keywordsBtn.addEventListener('click', () => {
-                const text = getFullEpigrafeText();
-                if (text) {
-                    const prompt = `Extrae las 5-7 palabras o términos clave más importantes del siguiente texto. Para cada término, proporciona una definición breve. Formatea la respuesta usando HTML con un div de clase "keyword-card" para cada término. Dentro de cada div, usa una etiqueta <h4> para el término y una etiqueta <p> para su definición.`;
-                    callGemini(prompt, "✨ Palabras Clave", 'html');
-                }
-            });
-            
-            mindmapBtn.addEventListener('click', () => {
-                const text = getFullEpigrafeText();
-                if(text){
-                    const prompt = `Crea un mapa mental para el siguiente texto. Usa una estructura de HTML con listas anidadas (<ul> y <li>) para representar la jerarquía de ideas. La idea principal debe ser el primer <li>.`;
-                    callGemini(prompt, "✨ Mapa Mental del Epígrafe", 'html');
-                }
-            });
-            
-            explainBtn.addEventListener('click', () => {
-                const selectedParagraphIndex = parseInt(paragraphSelect.value, 10);
-                if (paragraphs[selectedParagraphIndex]) {
-                    const text = paragraphs[selectedParagraphIndex].text;
-                    const prompt = `Explica el siguiente párrafo en términos más sencillos, como para alguien que no conoce el tema:\n\n---\n${text}\n---`;
-                    callGemini(prompt, "✨ Explicación Sencilla", 'text');
-                }
-            });
-
-
-            aiModalClose.addEventListener('click', () => {
-                aiModal.classList.add('hidden');
-            });
-            
-            function getFullEpigrafeText() {
-                const elements = getElementsForSelection();
-                if (elements) {
-                    return elements.map(el => el.textContent.trim()).join('\n\n');
-                }
-                return null;
-            }
-
-            async function callGemini(prompt, title, format = 'text') {
-                if(isSpeaking) speechSynthesis.pause();
-                showAiModal(title, '<div class="flex items-center"><div class="loader"></div><p class="ml-4">Generando respuesta...</p></div>');
-                
-                const apiKey = ""; // Canvas will provide the key
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-                
-                const payload = {
-                    contents: [{
-                        role: "user",
-                        parts: [{ text: prompt }]
-                    }]
-                };
-
-                try {
-                    const response = await fetch(apiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(`API Error: ${response.status} - ${errorData.error.message}`);
-                    }
-
-                    const result = await response.json();
-
-                    if (result.candidates && result.candidates.length > 0) {
-                        const text = result.candidates[0].content.parts[0].text;
-                        showAiModal(title, text, format);
-                    } else {
-                       throw new Error("No se recibió contenido válido de la API.");
-                    }
-                } catch (error) {
-                    console.error("Error calling Gemini API:", error);
-                    showAiModal("Error", `No se pudo generar una respuesta. Por favor, inténtalo de nuevo.\n\n${error.message}`, 'text');
-                }
-            }
-
-            function showAiModal(title, content, format = 'text') {
-                aiModalTitle.textContent = title;
-                if(format === 'html'){
-                    aiModalContent.innerHTML = content;
-                } else {
-                    aiModalContent.innerHTML = content.replace(/\n/g, '<br>');
-                }
-                aiModal.classList.remove('hidden');
             }
             
             initialize();
