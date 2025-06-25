@@ -15,6 +15,7 @@
         body {
             font-family: 'Inter', sans-serif;
         }
+        /* Resaltado de palabra individual (para escritorio) */
         .highlight {
             background-color: #fef08a; /* Amarillo claro */
             color: #713f12; /* Marrón oscuro */
@@ -22,6 +23,15 @@
             transition: background-color 0.1s ease-in-out, color 0.1s ease-in-out;
             padding: 2px 1px;
             margin: -2px -1px;
+        }
+        /* CORRECCIÓN: Nuevo estilo para resaltar el párrafo actual (para todos los dispositivos) */
+        .paragraph-highlight {
+            background-color: #eff6ff; /* Azul muy claro */
+            border-left: 4px solid #3b82f6;
+            padding-left: 1rem !important;
+            margin-left: -1rem !important;
+            border-radius: 4px;
+            transition: background-color 0.3s ease-in-out;
         }
         #text-reader-display-wrapper {
             height: 15rem;
@@ -239,6 +249,7 @@
             let temarioDoc = null;
             let paragraphs = [];
             let lastHighlightedSpan = null;
+            let lastHighlightedParagraph = null; // Para resaltar el párrafo completo
             let voices = [];
             let voicesReady = false;
             let utterance = null;
@@ -267,13 +278,11 @@
                 }
             }
             
-            // Mecanismo de reactivación para la API de voz.
             function speechReactivation() {
-                // Si estaba hablando pero la síntesis no está activa, puede haberse detenido.
                 if(isSpeaking && !speechSynthesis.speaking && !isPaused) {
                     log('El motor de voz parece haberse detenido, intentando reiniciar...');
-                    stopReadingInternal(); // Limpia la cola
-                    setTimeout(() => playCurrentParagraph(), 100); // Intenta reproducir de nuevo
+                    stopReadingInternal();
+                    setTimeout(() => playCurrentParagraph(), 100);
                 }
             }
 
@@ -286,7 +295,6 @@
                     }
                     populateVoiceList();
 
-                    // Inicia el mecanismo de reactivación
                     setInterval(speechReactivation, 3000); 
 
                     const response = await fetch(TEMARIO_URL);
@@ -384,7 +392,6 @@
                     const content = el.textContent.trim();
                     if (content.length > 0) {
                         if (pIndex === 0 && (el.tagName === 'H2' || el.tagName === 'H3' || el.tagName === 'H4') && epigrafeSelect.value !== 'all') {
-                           // No añadir el primer encabezado si es el título del epígrafe ya seleccionado
                         } else {
                             paragraphs.push({ text: content, tagName: el.tagName });
                             createParagraphElement(content, el.tagName, pIndex++);
@@ -417,10 +424,14 @@
             }
 
             function createParagraphElement(content, tagName, index) {
-                const newElement = document.createElement(tagName === 'LI' ? 'div' : tagName);
-                newElement.className = 'mb-4';
-                newElement.dataset.index = index;
+                // CORRECCIÓN: Se usa un `div` contenedor para aplicar el resaltado de párrafo de forma limpia.
+                const wrapper = document.createElement('div');
+                wrapper.dataset.index = index;
+                wrapper.className = 'mb-1'; // Margen pequeño para los contenedores
 
+                const newElement = document.createElement(tagName === 'LI' ? 'p' : tagName);
+                newElement.className = 'p-2'; // Padding interno para el texto
+                
                 if (tagName.startsWith('H')) {
                     newElement.classList.add('font-bold', 'text-xl', 'text-gray-800');
                 }
@@ -440,7 +451,9 @@
                         textContainer.appendChild(document.createTextNode(part));
                     }
                 });
-                textReaderDisplay.appendChild(newElement);
+                
+                wrapper.appendChild(newElement);
+                textReaderDisplay.appendChild(wrapper);
             }
             
             function handlePlayPause() {
@@ -468,6 +481,11 @@
                 stopRequested = true;
                 if(speechSynthesis.speaking) {
                     speechSynthesis.cancel();
+                }
+                // CORRECCIÓN: Asegurarse de quitar el resaltado de párrafo al detener
+                if (lastHighlightedParagraph) {
+                    lastHighlightedParagraph.classList.remove('paragraph-highlight');
+                    lastHighlightedParagraph = null;
                 }
                 if(resetIndex){
                    currentParagraphIndex = 0;
@@ -546,7 +564,20 @@
 
                 utterance.onstart = () => {
                     log(`onstart: Empezó a hablar el párrafo ${currentParagraphIndex}`);
-                    isSpeaking = true; isPaused = false; stopRequested = false; updateUIState('speaking'); 
+                    isSpeaking = true; isPaused = false; stopRequested = false;
+                    
+                    // CORRECCIÓN: Lógica para resaltar el párrafo completo
+                    if (lastHighlightedParagraph) {
+                        lastHighlightedParagraph.classList.remove('paragraph-highlight');
+                    }
+                    const paragraphElement = textReaderDisplay.querySelector(`[data-index="${currentParagraphIndex}"]`);
+                    if (paragraphElement) {
+                        paragraphElement.classList.add('paragraph-highlight');
+                        paragraphElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        lastHighlightedParagraph = paragraphElement;
+                    }
+                    
+                    updateUIState('speaking'); 
                 };
                 utterance.onpause = () => { 
                     log(`onpause: Pausado en el párrafo ${currentParagraphIndex}`);
@@ -561,20 +592,19 @@
                     if (event.name !== 'word' || stopRequested) return;
                     if (lastHighlightedSpan) lastHighlightedSpan.classList.remove('highlight');
                     
-                    const paragraphElement = textReaderDisplay.querySelector(`[data-index="${currentParagraphIndex}"]`);
+                    const paragraphElement = textReaderDisplay.querySelector(`[data-index="${currentParagraphIndex}"] > *`);
                     if (!paragraphElement) return;
 
                     const currentWordSpan = findSpanInParagraph(paragraphElement, event.charIndex);
                     
                     if (currentWordSpan) {
                         currentWordSpan.classList.add('highlight');
-                        currentWordSpan.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
                         lastHighlightedSpan = currentWordSpan;
                     }
                 };
 
                 utterance.onend = () => {
-                    log(`onend: Terminado el párrafo ${currentParagraphIndex}. Petición de parada: ${stopRequested}, Búsqueda en progreso: ${seekInProgress}`);
+                    log(`onend: Terminado el párrafo ${currentParagraphIndex}.`);
                     if (stopRequested || seekInProgress) return;
                     currentRepetition++;
                     const totalRepetitions = parseInt(repeatSelect.value, 10);
@@ -725,6 +755,10 @@
                  if (lastHighlightedSpan) {
                      lastHighlightedSpan.classList.remove('highlight');
                      lastHighlightedSpan = null;
+                 }
+                 if (lastHighlightedParagraph) {
+                    lastHighlightedParagraph.classList.remove('paragraph-highlight');
+                    lastHighlightedParagraph = null;
                  }
                  updateUIState('idle');
             }
