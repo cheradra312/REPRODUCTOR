@@ -119,12 +119,10 @@
                     <option value="1">1 vez</option>
                     <option value="2">2 veces</option>
                     <option value="3">3 veces</option>
-                    <!-- MODIFICACIÓN: Se añaden nuevas opciones de repetición -->
                     <option value="4">4 veces</option>
                     <option value="5">5 veces</option>
                 </select>
             </div>
-             <!-- MODIFICACIÓN: Se añade el botón de bucle -->
             <button id="loop-btn" title="Repetir en bucle" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center transition-colors">
                 <i class="fas fa-sync-alt"></i>
             </button>
@@ -137,7 +135,6 @@
              <button id="toggle-text-display-size" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center" title="Expandir Texto">
                <i class="fas fa-expand-alt"></i>
             </button>
-            <!-- MODIFICACIÓN: Se elimina el botón y menú de Herramientas IA -->
         </div>
         
         <div id="reader-status-container" class="flex items-center justify-center mb-4 min-h-[20px]">
@@ -159,6 +156,7 @@
                 }
             }
 
+            // Elementos del DOM
             const topicSelect = document.getElementById('topic-select');
             const epigrafeSelect = document.getElementById('epigrafe-select');
             const paragraphSelect = document.getElementById('paragraph-select');
@@ -180,6 +178,7 @@
             const toggleTextDisplaySizeBtn = document.getElementById('toggle-text-display-size');
             const loopBtn = document.getElementById('loop-btn');
 
+            // Variables de estado
             let temarioDoc = null;
             let paragraphs = [];
             let lastHighlightedSpan = null;
@@ -187,13 +186,11 @@
             let voices = [];
             let voicesReady = false;
             let utterance = null;
-            
             let isSpeaking = false;
             let isPaused = false;
             let stopRequested = false;
             let seekInProgress = false;
-            let isLooping = false; // MODIFICACIÓN: Nueva variable de estado para el bucle
-            
+            let isLooping = false;
             let currentParagraphIndex = 0;
             let currentRepetition = 0;
             let currentSpeechRate = 1.0;
@@ -201,7 +198,30 @@
             const maxSpeechRate = 2.0;
             const speechRateIncrement = 0.25;
             
+            // MODIFICACIÓN: Variables para el audio en segundo plano
+            let audioContext;
+            let silentAudioSource;
+            let isBackgroundAudioInitialized = false;
+
             const TEMARIO_URL = 'https://raw.githubusercontent.com/cheradra312/MA_1-15/d0b4620e2ce99e9bc0459bf95ed9bc10cec9d2be/MEC2T1_Temario.html';
+
+            // MODIFICACIÓN: Función para inicializar el audio silencioso
+            function initBackgroundAudio() {
+                if (isBackgroundAudioInitialized) return;
+                try {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const buffer = audioContext.createBuffer(1, 1, 22050);
+                    silentAudioSource = audioContext.createBufferSource();
+                    silentAudioSource.buffer = buffer;
+                    silentAudioSource.loop = true;
+                    silentAudioSource.connect(audioContext.destination);
+                    silentAudioSource.start();
+                    isBackgroundAudioInitialized = true;
+                    log('Audio en segundo plano inicializado.');
+                } catch (e) {
+                    log('Error al inicializar el audio en segundo plano:', e);
+                }
+            }
 
             function populateVoiceList() {
                 if (voicesReady) return;
@@ -278,7 +298,6 @@
             speedDownBtn.addEventListener('click', decreaseSpeed);
             toggleTextDisplaySizeBtn.addEventListener('click', toggleTextDisplaySize);
             
-            // MODIFICACIÓN: Event listener para el botón de bucle
             loopBtn.addEventListener('click', () => {
                 isLooping = !isLooping;
                 loopBtn.classList.toggle('bg-blue-600', isLooping);
@@ -408,6 +427,10 @@
             
             function handlePlayPause() {
                 log('handlePlayPause called.', { isPaused, isSpeaking });
+                
+                // MODIFICACIÓN: Inicializa el audio de fondo con la primera interacción del usuario
+                initBackgroundAudio();
+
                 if (!voicesReady){
                     log('Las voces no están listas. Intentando cargarlas de nuevo.');
                     readerStatus.textContent = "Las voces del navegador aún no están listas. Por favor, espere un momento.";
@@ -492,7 +515,6 @@
                 }
 
                 if (currentParagraphIndex >= paragraphs.length) {
-                    // MODIFICACIÓN: Lógica de bucle
                     if(isLooping) {
                         log('Fin de la selección, reiniciando en bucle.');
                         currentParagraphIndex = 0;
@@ -724,3 +746,4 @@
     </script>
 </body>
 </html>
+
