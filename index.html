@@ -247,6 +247,7 @@
             let isPaused = false;
             let stopRequested = false;
             let seekInProgress = false;
+            let wasSpeakingBeforeHidden = false; // Para gestionar el cambio de ventana
             
             let currentParagraphIndex = 0;
             let currentRepetition = 0;
@@ -255,7 +256,6 @@
             const maxSpeechRate = 2.0;
             const speechRateIncrement = 0.25;
             
-            // CORRECCIÓN: Se usa la URL "raw" de la versión más reciente del archivo.
             const TEMARIO_URL = 'https://raw.githubusercontent.com/cheradra312/MA_1-15/d0b4620e2ce99e9bc0459bf95ed9bc10cec9d2be/MEC2T1_Temario.html';
 
             function populateVoiceList() {
@@ -265,6 +265,18 @@
                     log('Voces cargadas:', voices.length);
                     voicesReady = true;
                     updateUIState('idle'); 
+                }
+            }
+            
+            // CORRECCIÓN: Mecanismo de reactivación para la API de voz.
+            function speechReactivation() {
+                if(isSpeaking && !speechSynthesis.speaking) {
+                    log('El motor de voz parece haberse detenido, intentando reiniciar...');
+                    stopReadingInternal(); // Limpia la cola
+                    setTimeout(() => playCurrentParagraph(), 100); // Intenta reproducir de nuevo
+                } else if(speechSynthesis.paused) {
+                    log('El motor de voz está pausado. Reactivando...');
+                    speechSynthesis.resume();
                 }
             }
 
@@ -277,14 +289,25 @@
                     }
                     populateVoiceList();
 
-                    // Mecanismo de reactivación para la API de voz.
-                    setInterval(() => {
-                        if (!speechSynthesis.speaking && isSpeaking) {
-                           log('Motor de voz inactivo, reactivando...');
-                           speechSynthesis.resume();
-                           speechSynthesis.pause();
+                    // Inicia el mecanismo de reactivación
+                    setInterval(speechReactivation, 3000); 
+
+                    // CORRECCIÓN: Gestiona la visibilidad de la pestaña
+                    document.addEventListener('visibilitychange', () => {
+                        if (document.hidden) {
+                            if (isSpeaking && !isPaused) {
+                                wasSpeakingBeforeHidden = true;
+                                speechSynthesis.pause();
+                                log("Pestaña oculta, reproducción pausada.");
+                            }
+                        } else {
+                            if (wasSpeakingBeforeHidden) {
+                                wasSpeakingBeforeHidden = false;
+                                speechSynthesis.resume();
+                                log("Pestaña visible, reproducción reanudada.");
+                            }
                         }
-                    }, 5000);
+                    });
 
                     const response = await fetch(TEMARIO_URL);
                     if (!response.ok) throw new Error(`Error de red: ${response.statusText}`);
@@ -292,14 +315,12 @@
                     const parser = new DOMParser();
                     temarioDoc = parser.parseFromString(htmlText, "text/html");
                     
-                    // CORRECCIÓN: Selector más robusto que busca `div` o `section`.
                     const topicElements = temarioDoc.querySelectorAll('div[id^="MEC2T"], section[id^="MEC2T"]');
                     topicSelect.innerHTML = '';
                     
                     topicElements.forEach(element => {
                         const option = document.createElement('option');
                         option.value = element.id;
-                        // CORRECCIÓN: Busca h1 o h2 para el título
                         option.textContent = element.querySelector('h1, h2')?.textContent || element.id;
                         topicSelect.appendChild(option);
                     });
@@ -349,7 +370,6 @@
                         allOption.textContent = 'Tema Completo';
                         epigrafeSelect.appendChild(allOption);
                         
-                        // CORRECCIÓN: Busca h2, h3, o h4 para los epígrafes.
                         const epigrafes = topicElement.querySelectorAll('h2, h3, h4');
                         epigrafes.forEach((h, index) => {
                             const option = document.createElement('option');
@@ -381,28 +401,12 @@
                 
                 let pIndex = 0;
                 elements.forEach(el => {
-                    // Se omite el título principal del tema para no duplicarlo en el lector
-                    if (el.tagName === 'H1' || el.tagName === 'H2') {
-                        if (pIndex === 0 && elements.length > 1) {
-                           // No añadir el primer encabezado si es el título del epígrafe
+                    const content = el.textContent.trim();
+                    if (content.length > 0) {
+                        // Evita añadir el título principal del epígrafe si ya está seleccionado
+                        if (pIndex === 0 && (el.tagName === 'H2' || el.tagName === 'H3' || el.tagName === 'H4') && epigrafeSelect.value !== 'all') {
+                           // No añadirlo, ya está en el select
                         } else {
-                           const content = el.textContent.trim();
-                            if (content.length > 0) {
-                                paragraphs.push({ text: content, tagName: el.tagName });
-                                createParagraphElement(content, el.tagName, pIndex++);
-                            }
-                        }
-                    } else if (el.tagName === 'UL' || el.tagName === 'OL') {
-                        Array.from(el.children).forEach(li => {
-                            const liContent = li.textContent.trim();
-                            if(liContent.length > 0) {
-                                paragraphs.push({ text: liContent, tagName: 'LI' });
-                                createParagraphElement(liContent, 'li', pIndex++);
-                            }
-                        });
-                    } else {
-                        const content = el.textContent.trim();
-                        if (content.length > 0) {
                             paragraphs.push({ text: content, tagName: el.tagName });
                             createParagraphElement(content, el.tagName, pIndex++);
                         }
@@ -468,10 +472,10 @@
                     populateVoiceList();
                     return;
                 }
-                if (speechSynthesis.paused) {
+                if (isPaused) {
                     log('Reanudando la reproducción.');
                     speechSynthesis.resume();
-                } else if (speechSynthesis.speaking) {
+                } else if (isSpeaking) {
                     log('Pausando la reproducción.');
                     speechSynthesis.pause();
                 } else {
@@ -563,7 +567,7 @@
 
                 utterance.onstart = () => {
                     log(`onstart: Empezó a hablar el párrafo ${currentParagraphIndex}`);
-                    isSpeaking = true; isPaused = false; stopRequested = false; updateUIState('speaking'); 
+                    isSpeaking = true; isPaused = false; stopRequested = false; wasSpeakingBeforeHidden = false; updateUIState('speaking'); 
                 };
                 utterance.onpause = () => { 
                     log(`onpause: Pausado en el párrafo ${currentParagraphIndex}`);
