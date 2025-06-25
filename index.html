@@ -247,7 +247,6 @@
             let isPaused = false;
             let stopRequested = false;
             let seekInProgress = false;
-            let wasSpeakingBeforeHidden = false; // Para gestionar el cambio de ventana
             
             let currentParagraphIndex = 0;
             let currentRepetition = 0;
@@ -268,15 +267,13 @@
                 }
             }
             
-            // CORRECCIÓN: Mecanismo de reactivación para la API de voz.
+            // Mecanismo de reactivación para la API de voz.
             function speechReactivation() {
-                if(isSpeaking && !speechSynthesis.speaking) {
+                // Si estaba hablando pero la síntesis no está activa, puede haberse detenido.
+                if(isSpeaking && !speechSynthesis.speaking && !isPaused) {
                     log('El motor de voz parece haberse detenido, intentando reiniciar...');
                     stopReadingInternal(); // Limpia la cola
                     setTimeout(() => playCurrentParagraph(), 100); // Intenta reproducir de nuevo
-                } else if(speechSynthesis.paused) {
-                    log('El motor de voz está pausado. Reactivando...');
-                    speechSynthesis.resume();
                 }
             }
 
@@ -291,23 +288,6 @@
 
                     // Inicia el mecanismo de reactivación
                     setInterval(speechReactivation, 3000); 
-
-                    // CORRECCIÓN: Gestiona la visibilidad de la pestaña
-                    document.addEventListener('visibilitychange', () => {
-                        if (document.hidden) {
-                            if (isSpeaking && !isPaused) {
-                                wasSpeakingBeforeHidden = true;
-                                speechSynthesis.pause();
-                                log("Pestaña oculta, reproducción pausada.");
-                            }
-                        } else {
-                            if (wasSpeakingBeforeHidden) {
-                                wasSpeakingBeforeHidden = false;
-                                speechSynthesis.resume();
-                                log("Pestaña visible, reproducción reanudada.");
-                            }
-                        }
-                    });
 
                     const response = await fetch(TEMARIO_URL);
                     if (!response.ok) throw new Error(`Error de red: ${response.statusText}`);
@@ -403,9 +383,8 @@
                 elements.forEach(el => {
                     const content = el.textContent.trim();
                     if (content.length > 0) {
-                        // Evita añadir el título principal del epígrafe si ya está seleccionado
                         if (pIndex === 0 && (el.tagName === 'H2' || el.tagName === 'H3' || el.tagName === 'H4') && epigrafeSelect.value !== 'all') {
-                           // No añadirlo, ya está en el select
+                           // No añadir el primer encabezado si es el título del epígrafe ya seleccionado
                         } else {
                             paragraphs.push({ text: content, tagName: el.tagName });
                             createParagraphElement(content, el.tagName, pIndex++);
@@ -567,7 +546,7 @@
 
                 utterance.onstart = () => {
                     log(`onstart: Empezó a hablar el párrafo ${currentParagraphIndex}`);
-                    isSpeaking = true; isPaused = false; stopRequested = false; wasSpeakingBeforeHidden = false; updateUIState('speaking'); 
+                    isSpeaking = true; isPaused = false; stopRequested = false; updateUIState('speaking'); 
                 };
                 utterance.onpause = () => { 
                     log(`onpause: Pausado en el párrafo ${currentParagraphIndex}`);
