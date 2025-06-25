@@ -24,7 +24,7 @@
             padding: 2px 1px;
             margin: -2px -1px;
         }
-        /* CORRECCIÓN: Nuevo estilo para resaltar el párrafo actual (para todos los dispositivos) */
+        /* Nuevo estilo para resaltar el párrafo actual (para todos los dispositivos) */
         .paragraph-highlight {
             background-color: #eff6ff; /* Azul muy claro */
             border-left: 4px solid #3b82f6;
@@ -373,6 +373,7 @@
                 prepareAndDisplayText();
             }
 
+            // CORRECCIÓN: Lógica mejorada para manejar listas y otros elementos.
             function prepareAndDisplayText(selectionChanged = false) {
                 if (selectionChanged) {
                     stopReadingInternal(true);
@@ -389,10 +390,19 @@
                 
                 let pIndex = 0;
                 elements.forEach(el => {
-                    const content = el.textContent.trim();
-                    if (content.length > 0) {
-                        if (pIndex === 0 && (el.tagName === 'H2' || el.tagName === 'H3' || el.tagName === 'H4') && epigrafeSelect.value !== 'all') {
-                        } else {
+                    if (el.tagName === 'UL' || el.tagName === 'OL') {
+                        // Si es una lista, procesa cada elemento `<li>` individualmente.
+                        Array.from(el.children).forEach(li => {
+                            const liContent = li.textContent.trim();
+                            if(liContent.length > 0) {
+                                paragraphs.push({ text: liContent, tagName: 'LI' });
+                                createParagraphElement(liContent, 'LI', pIndex++);
+                            }
+                        });
+                    } else {
+                        // Para cualquier otro elemento (p, h2, h3, etc.)
+                        const content = el.textContent.trim();
+                        if (content.length > 0) {
                             paragraphs.push({ text: content, tagName: el.tagName });
                             createParagraphElement(content, el.tagName, pIndex++);
                         }
@@ -424,20 +434,18 @@
             }
 
             function createParagraphElement(content, tagName, index) {
-                // CORRECCIÓN: Se usa un `div` contenedor para aplicar el resaltado de párrafo de forma limpia.
                 const wrapper = document.createElement('div');
                 wrapper.dataset.index = index;
-                wrapper.className = 'mb-1'; // Margen pequeño para los contenedores
+                wrapper.className = 'mb-1';
 
                 const newElement = document.createElement(tagName === 'LI' ? 'p' : tagName);
-                newElement.className = 'p-2'; // Padding interno para el texto
+                newElement.className = 'p-2';
                 
                 if (tagName.startsWith('H')) {
                     newElement.classList.add('font-bold', 'text-xl', 'text-gray-800');
-                }
-                 if (tagName === 'LI') {
+                } else if (tagName === 'LI') {
                     newElement.classList.add('flex', 'items-start');
-                    newElement.innerHTML = `<span class="mr-2 text-blue-600">&bull;</span><span class="flex-1"></span>`;
+                    newElement.innerHTML = `<span class="mr-2 text-blue-600 self-center flex-shrink-0">&bull;</span><span class="flex-1"></span>`;
                 }
 
                 const textContainer = newElement.querySelector('.flex-1') || newElement;
@@ -482,7 +490,6 @@
                 if(speechSynthesis.speaking) {
                     speechSynthesis.cancel();
                 }
-                // CORRECCIÓN: Asegurarse de quitar el resaltado de párrafo al detener
                 if (lastHighlightedParagraph) {
                     lastHighlightedParagraph.classList.remove('paragraph-highlight');
                     lastHighlightedParagraph = null;
@@ -566,7 +573,6 @@
                     log(`onstart: Empezó a hablar el párrafo ${currentParagraphIndex}`);
                     isSpeaking = true; isPaused = false; stopRequested = false;
                     
-                    // CORRECCIÓN: Lógica para resaltar el párrafo completo
                     if (lastHighlightedParagraph) {
                         lastHighlightedParagraph.classList.remove('paragraph-highlight');
                     }
