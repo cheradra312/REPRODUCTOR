@@ -3,30 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Herramienta de Lectura de Texto Avanzada</title>
-    <!-- Tailwind CSS para un diseño moderno -->
+    <title>Lector de Temarios por Bloques</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Iconos de Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-    <!-- Fuente Inter de Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
         body {
             font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
         }
-        /* Resaltado de palabra individual (para escritorio) */
+        /* Ocultar elementos */
+        .hidden {
+            display: none;
+        }
+        /* Estilos para las tarjetas de selección */
+        .bloque-card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .bloque-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        /* Estilos del reproductor (existentes) */
         .highlight {
-            background-color: #fef08a; /* Amarillo claro */
-            color: #713f12; /* Marrón oscuro */
+            background-color: #fef08a;
+            color: #713f12;
             border-radius: 4px;
             transition: background-color 0.1s ease-in-out, color 0.1s ease-in-out;
             padding: 2px 1px;
             margin: -2px -1px;
         }
-        /* Nuevo estilo para resaltar el párrafo actual (para todos los dispositivos) */
         .paragraph-highlight {
-            background-color: #eff6ff; /* Azul muy claro */
+            background-color: #eff6ff;
             border-left: 4px solid #3b82f6;
             padding-left: 1rem !important;
             margin-left: -1rem !important;
@@ -74,15 +83,27 @@
         }
     </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+<body class="flex items-center justify-center min-h-screen p-4">
 
-    <div class="w-full max-w-6xl bg-white rounded-xl shadow-2xl p-6 md:p-8">
-        <div class="text-center mb-4 flex flex-col items-center">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Lector de Temario</h1>
-            <div id="speaker-icon" class="text-gray-400 text-2xl transition-colors duration-300">
-                <i class="fas fa-volume-up"></i>
+    <div id="selection-screen" class="w-full max-w-4xl text-center">
+        <h1 class="text-4xl md:text-5xl font-bold text-gray-900 mb-8">Selecciona un Bloque Temático</h1>
+        <div id="bloque-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             </div>
-        </div>
+    </div>
+
+    <div id="player-screen" class="w-full max-w-6xl bg-white rounded-xl shadow-2xl p-6 md:p-8 hidden">
+        <div class="flex justify-between items-center mb-4">
+             <button id="back-to-selection-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors">
+                <i class="fas fa-arrow-left"></i>
+                Volver
+            </button>
+            <div class="text-center flex flex-col items-center flex-grow">
+                 <h1 id="player-title" class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Lector de Temario</h1>
+                 <div id="speaker-icon" class="text-gray-400 text-2xl transition-colors duration-300">
+                    <i class="fas fa-volume-up"></i>
+                </div>
+            </div>
+             <div class="w-24"></div> </div>
         
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
             <div>
@@ -139,7 +160,7 @@
         
         <div id="reader-status-container" class="flex items-center justify-center mb-4 min-h-[20px]">
             <div id="loading-spinner" class="loader mr-2 hidden"></div>
-            <div id="reader-status" class="text-center text-sm text-gray-500">Cargando temario...</div>
+            <div id="reader-status" class="text-center text-sm text-gray-500">Cargando...</div>
         </div>
 
         <div id="text-reader-display-wrapper">
@@ -148,15 +169,35 @@
     </div>
     
     <script>
-        document.addEventListener('DOMContentLoaded', async () => {
+        document.addEventListener('DOMContentLoaded', () => {
             const DEBUG = true;
             function log(...args) {
-                if (DEBUG) {
-                    console.log('[Lector]', ...args);
-                }
+                if (DEBUG) console.log('[Lector]', ...args);
             }
 
-            // Elementos del DOM
+            // --- CONFIGURACIÓN DE BLOQUES ---
+            // Añade aquí nuevos bloques. El nombre del archivo debe coincidir con el que subas a GitHub.
+            const BLOQUES = [
+                { nombre: "Administrativo y Aguas", archivo: "Temario_Adm.html", icono: "fa-gavel" },
+                { nombre: "Costas", archivo: "Temario_Cos.html", icono: "fa-water" },
+                { nombre: "Carreteras", archivo: "Temario_Carr.html", icono: "fa-road" },
+                { nombre: "Ferrocarriles", archivo: "Temario_F.html", icono: "fa-train" },
+                { nombre: "Transportes", archivo: "Temario_T.html", icono: "fa-bus" },
+                { nombre: "Medio Ambiente", archivo: "Temario_MA.html", icono: "fa-leaf" },
+                { nombre: "Aguas", archivo: "Temario_Ag.html", icono: "fa-tint" },
+            ];
+            
+            // Reemplaza esta URL con la ruta base de tu repositorio de GitHub
+            const GITHUB_BASE_URL = 'https://raw.githubusercontent.com/cheradra312/MA_1-15/main/';
+
+            // --- ELEMENTOS DEL DOM ---
+            const selectionScreen = document.getElementById('selection-screen');
+            const playerScreen = document.getElementById('player-screen');
+            const bloqueContainer = document.getElementById('bloque-container');
+            const backToSelectionBtn = document.getElementById('back-to-selection-btn');
+
+            // Elementos del reproductor
+            const playerTitle = document.getElementById('player-title');
             const topicSelect = document.getElementById('topic-select');
             const epigrafeSelect = document.getElementById('epigrafe-select');
             const paragraphSelect = document.getElementById('paragraph-select');
@@ -178,7 +219,7 @@
             const toggleTextDisplaySizeBtn = document.getElementById('toggle-text-display-size');
             const loopBtn = document.getElementById('loop-btn');
 
-            // Variables de estado
+            // --- VARIABLES DE ESTADO DEL REPRODUCTOR ---
             let temarioDoc = null;
             let paragraphs = [];
             let lastHighlightedSpan = null;
@@ -198,30 +239,125 @@
             const maxSpeechRate = 2.0;
             const speechRateIncrement = 0.25;
             
-            // MODIFICACIÓN: Variables para el audio en segundo plano
-            let audioContext;
-            let silentAudioSource;
-            let isBackgroundAudioInitialized = false;
+            // --- INICIALIZACIÓN ---
 
-            const TEMARIO_URL = 'https://raw.githubusercontent.com/cheradra312/MA_1-15/00c25b1a5fbacba19cbee5ce51944095f2938af4/MEC2T1_Temario.html';
+            function initializeApp() {
+                createSelectionCards();
+                setupEventListeners();
+                
+                // Cargar voces del navegador
+                if (speechSynthesis.onvoiceschanged !== undefined) {
+                    speechSynthesis.onvoiceschanged = populateVoiceList;
+                }
+                populateVoiceList();
+                
+                // Reactivación periódica del motor de voz
+                setInterval(speechReactivation, 3000); 
+            }
             
-            // MODIFICACIÓN: Función para inicializar el audio silencioso
-            function initBackgroundAudio() {
-                if (isBackgroundAudioInitialized) return;
-                try {
-                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    const buffer = audioContext.createBuffer(1, 1, 22050);
-                    silentAudioSource = audioContext.createBufferSource();
-                    silentAudioSource.buffer = buffer;
-                    silentAudioSource.loop = true;
-                    silentAudioSource.connect(audioContext.destination);
-                    silentAudioSource.start();
-                    isBackgroundAudioInitialized = true;
-                    log('Audio en segundo plano inicializado.');
-                } catch (e) {
-                    log('Error al inicializar el audio en segundo plano:', e);
+            function createSelectionCards() {
+                bloqueContainer.innerHTML = '';
+                BLOQUES.forEach(bloque => {
+                    const card = document.createElement('button');
+                    card.className = 'bloque-card bg-white p-6 rounded-lg shadow-md flex flex-col items-center justify-center text-center cursor-pointer';
+                    card.dataset.url = GITHUB_BASE_URL + bloque.archivo;
+                    card.dataset.nombre = bloque.nombre;
+                    
+                    card.innerHTML = `
+                        <i class="fas ${bloque.icono} text-4xl text-blue-600 mb-4"></i>
+                        <h2 class="text-xl font-semibold text-gray-800">${bloque.nombre}</h2>
+                    `;
+                    bloqueContainer.appendChild(card);
+                });
+            }
+
+            function setupEventListeners() {
+                // Navegación entre pantallas
+                bloqueContainer.addEventListener('click', handleBloqueSelection);
+                backToSelectionBtn.addEventListener('click', handleBackToSelection);
+
+                // Controles del reproductor
+                topicSelect.addEventListener('change', updateEpigrafeSelect);
+                epigrafeSelect.addEventListener('change', () => prepareAndDisplayText(true));
+                paragraphSelect.addEventListener('change', () => {
+                    currentParagraphIndex = parseInt(paragraphSelect.value, 10);
+                    if (isSpeaking) {
+                        stopReadingInternal();
+                        setTimeout(playCurrentParagraph, 150);
+                    } else {
+                        updateProgressBar();
+                    }
+                });
+
+                playPauseBtn.addEventListener('click', handlePlayPause);
+                rewindBtn.addEventListener('click', () => seek(-1));
+                forwardBtn.addEventListener('click', () => seek(1));
+                speedUpBtn.addEventListener('click', increaseSpeed);
+                speedDownBtn.addEventListener('click', decreaseSpeed);
+                toggleTextDisplaySizeBtn.addEventListener('click', toggleTextDisplaySize);
+                loopBtn.addEventListener('click', toggleLoop);
+                
+                window.onbeforeunload = () => {
+                    speechSynthesis.cancel();
+                };
+            }
+
+            function handleBloqueSelection(event) {
+                const card = event.target.closest('.bloque-card');
+                if (card) {
+                    const url = card.dataset.url;
+                    const nombre = card.dataset.nombre;
+                    
+                    selectionScreen.classList.add('hidden');
+                    playerScreen.classList.remove('hidden');
+                    
+                    playerTitle.textContent = `Lector: ${nombre}`;
+                    initializePlayer(url);
                 }
             }
+            
+            function handleBackToSelection() {
+                stopReadingInternal(true);
+                playerScreen.classList.add('hidden');
+                selectionScreen.classList.remove('hidden');
+                resetPlayerUI();
+            }
+
+            async function initializePlayer(url) {
+                loadingSpinner.classList.remove('hidden');
+                readerStatus.textContent = `Cargando temario desde GitHub...`;
+                resetPlayerUI();
+                
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error(`Error de red: ${response.statusText}`);
+                    const htmlText = await response.text();
+                    const parser = new DOMParser();
+                    temarioDoc = parser.parseFromString(htmlText, "text/html");
+                    
+                    const topicElements = temarioDoc.querySelectorAll('body > section[id], body > div[id]');
+                    topicSelect.innerHTML = '';
+                    
+                    topicElements.forEach(element => {
+                        const option = document.createElement('option');
+                        option.value = element.id;
+                        option.textContent = element.querySelector('h1, h2')?.textContent.trim() || element.id;
+                        topicSelect.appendChild(option);
+                    });
+                    
+                    updateEpigrafeSelect();
+                    updateUIState('idle');
+                    readerStatus.textContent = "Temario cargado. Selecciona un tema y epígrafe.";
+                } catch (error) {
+                    log("Error fatal al cargar el temario:", error);
+                    readerStatus.textContent = "No se pudo cargar el temario.";
+                    updateUIState('error');
+                } finally {
+                    loadingSpinner.classList.add('hidden');
+                }
+            }
+
+            // --- LÓGICA DEL REPRODUCTOR ---
 
             function populateVoiceList() {
                 if (voicesReady) return;
@@ -229,7 +365,6 @@
                 if(voices.length > 0){
                     log('Voces cargadas:', voices.length);
                     voicesReady = true;
-                    updateUIState('idle'); 
                 }
             }
             
@@ -240,73 +375,7 @@
                     setTimeout(() => playCurrentParagraph(), 100);
                 }
             }
-
-            async function initialize() {
-                loadingSpinner.classList.remove('hidden');
-                readerStatus.textContent = `Cargando temario desde GitHub...`;
-                try {
-                    if (speechSynthesis.onvoiceschanged !== undefined) {
-                        speechSynthesis.onvoiceschanged = populateVoiceList;
-                    }
-                    populateVoiceList();
-
-                    setInterval(speechReactivation, 3000); 
-
-                    const response = await fetch(TEMARIO_URL);
-                    if (!response.ok) throw new Error(`Error de red: ${response.statusText}`);
-                    const htmlText = await response.text();
-                    const parser = new DOMParser();
-                    temarioDoc = parser.parseFromString(htmlText, "text/html");
-                    
-                    const topicElements = temarioDoc.querySelectorAll('div[id^="MEC2T"], section[id^="MEC2T"]');
-                    topicSelect.innerHTML = '';
-                    
-                    topicElements.forEach(element => {
-                        const option = document.createElement('option');
-                        option.value = element.id;
-                        option.textContent = element.querySelector('h1, h2')?.textContent || element.id;
-                        topicSelect.appendChild(option);
-                    });
-                    
-                    updateEpigrafeSelect();
-                } catch (error) {
-                    log("Error fatal al cargar el temario:", error);
-                    readerStatus.textContent = "No se pudo cargar el temario desde GitHub.";
-                } finally {
-                    loadingSpinner.classList.add('hidden');
-                    updateUIState('idle');
-                    readerStatus.textContent = "Temario cargado. Selecciona un tema y epígrafe.";
-                }
-            }
             
-            topicSelect.addEventListener('change', updateEpigrafeSelect);
-            epigrafeSelect.addEventListener('change', () => prepareAndDisplayText(true));
-            paragraphSelect.addEventListener('change', () => {
-                currentParagraphIndex = parseInt(paragraphSelect.value, 10);
-                if (isSpeaking) {
-                    stopReadingInternal();
-                    setTimeout(playCurrentParagraph, 150);
-                } else {
-                    updateProgressBar();
-                }
-            });
-
-            playPauseBtn.addEventListener('click', handlePlayPause);
-            rewindBtn.addEventListener('click', () => seek(-1));
-            forwardBtn.addEventListener('click', () => seek(1));
-            speedUpBtn.addEventListener('click', increaseSpeed);
-            speedDownBtn.addEventListener('click', decreaseSpeed);
-            toggleTextDisplaySizeBtn.addEventListener('click', toggleTextDisplaySize);
-            
-            loopBtn.addEventListener('click', () => {
-                isLooping = !isLooping;
-                loopBtn.classList.toggle('bg-blue-600', isLooping);
-                loopBtn.classList.toggle('text-white', isLooping);
-                loopBtn.classList.toggle('bg-gray-200', !isLooping);
-                loopBtn.classList.toggle('text-gray-700', !isLooping);
-                log('Modo bucle:', isLooping ? 'Activado' : 'Desactivado');
-            });
-
             function updateEpigrafeSelect() {
                 stopReadingInternal(true);
                 const topicId = topicSelect.value;
@@ -338,34 +407,33 @@
             }
 
             function prepareAndDisplayText(selectionChanged = false) {
-                if (selectionChanged) {
-                    stopReadingInternal(true);
-                }
+                if (selectionChanged) stopReadingInternal(true);
+                
                 const elements = getElementsForSelection();
                 textReaderDisplay.innerHTML = '';
                 paragraphs = [];
-                paragraphSelect.innerHTML = '';
-
+                
                 if (!elements) {
-                    paragraphSelect.disabled = true;
+                    resetParagraphs();
                     return;
                 };
                 
                 let pIndex = 0;
                 elements.forEach(el => {
-                    if (el.tagName === 'UL' || el.tagName === 'OL') {
+                    const tagName = el.tagName.toUpperCase();
+                    if (['UL', 'OL'].includes(tagName)) {
                         Array.from(el.children).forEach(li => {
-                            const liContent = li.textContent.trim();
-                            if(liContent.length > 0) {
-                                paragraphs.push({ text: liContent, tagName: 'LI' });
-                                createParagraphElement(liContent, 'LI', pIndex++);
+                            const content = li.textContent.trim();
+                            if(content.length > 0) {
+                                paragraphs.push({ text: content, tagName: 'LI' });
+                                createParagraphElement(content, 'LI', pIndex++);
                             }
                         });
                     } else {
                         const content = el.textContent.trim();
                         if (content.length > 0) {
-                            paragraphs.push({ text: content, tagName: el.tagName });
-                            createParagraphElement(content, el.tagName, pIndex++);
+                            paragraphs.push({ text: content, tagName });
+                            createParagraphElement(content, tagName, pIndex++);
                         }
                     }
                 });
@@ -375,68 +443,16 @@
                 updateUIState('idle');
             }
 
-            function populateParagraphSelect() {
-                paragraphSelect.innerHTML = '';
-                if(paragraphs.length > 0){
-                    paragraphs.forEach((p, index) => {
-                        const option = document.createElement('option');
-                        option.value = index;
-                        const snippet = p.text.length > 60 ? p.text.substring(0, 60) + '...' : p.text;
-                        option.textContent = `Párrafo ${index + 1}: ${snippet}`;
-                        if (['H1', 'H2', 'H3', 'H4'].includes(p.tagName)) {
-                            option.classList.add('font-bold', 'text-black');
-                        }
-                        paragraphSelect.appendChild(option);
-                    });
-                    paragraphSelect.disabled = false;
-                } else {
-                    paragraphSelect.disabled = true;
-                }
-            }
-
-            function createParagraphElement(content, tagName, index) {
-                const wrapper = document.createElement('div');
-                wrapper.dataset.index = index;
-                wrapper.className = 'mb-1';
-
-                const newElement = document.createElement(tagName === 'LI' ? 'p' : tagName);
-                newElement.className = 'p-2';
-                
-                if (tagName.startsWith('H')) {
-                    newElement.classList.add('font-bold', 'text-xl', 'text-gray-800');
-                } else if (tagName === 'LI') {
-                    newElement.classList.add('flex', 'items-start');
-                    newElement.innerHTML = `<span class="mr-2 text-blue-600 self-center flex-shrink-0">&bull;</span><span class="flex-1"></span>`;
-                }
-
-                const textContainer = newElement.querySelector('.flex-1') || newElement;
-                const wordsAndSpaces = content.split(/(\s+)/);
-                wordsAndSpaces.forEach(part => {
-                    if (part.trim() !== '') {
-                        const span = document.createElement('span');
-                        span.textContent = part;
-                        textContainer.appendChild(span);
-                    } else {
-                        textContainer.appendChild(document.createTextNode(part));
-                    }
-                });
-                
-                wrapper.appendChild(newElement);
-                textReaderDisplay.appendChild(wrapper);
-            }
-            
-            function handlePlayPause() {
+             function handlePlayPause() {
                 log('handlePlayPause called.', { isPaused, isSpeaking });
                 
-                // MODIFICACIÓN: Inicializa el audio de fondo con la primera interacción del usuario
-                initBackgroundAudio();
-
                 if (!voicesReady){
-                    log('Las voces no están listas. Intentando cargarlas de nuevo.');
-                    readerStatus.textContent = "Las voces del navegador aún no están listas. Por favor, espere un momento.";
+                    log('Las voces no están listas.');
+                    readerStatus.textContent = "Las voces del navegador aún no están listas.";
                     populateVoiceList();
                     return;
                 }
+
                 if (isPaused) {
                     log('Reanudando la reproducción.');
                     speechSynthesis.resume();
@@ -452,7 +468,7 @@
             function stopReadingInternal(resetIndex = false) {
                 log('stopReadingInternal llamado. reseteando índice:', resetIndex);
                 stopRequested = true;
-                if(speechSynthesis.speaking) {
+                if(speechSynthesis.speaking || speechSynthesis.pending) {
                     speechSynthesis.cancel();
                 }
                 if (lastHighlightedParagraph) {
@@ -466,6 +482,10 @@
                 }
             }
 
+            // ... (resto de funciones del reproductor: getElementsForSelection, startPlaybackQueue, playCurrentParagraph, etc.)
+            // Las funciones internas del reproductor se mantienen, ya que la lógica principal de la selección de contenido está separada.
+            // He pegado las funciones clave abajo para asegurar la integridad del script.
+
             function getElementsForSelection() {
                 const topicId = topicSelect.value;
                 const epigrafeIndexStr = epigrafeSelect.value;
@@ -476,7 +496,7 @@
                 if (!topicElement) return null;
 
                 if (epigrafeIndexStr === 'all' || epigrafeIndexStr === null || epigrafeIndexStr === "") {
-                    return Array.from(topicElement.children);
+                    return Array.from(topicElement.querySelectorAll('h1,h2,h3,h4,h5,h6,p,ul,ol'));
                 }
                 
                 const allHeadings = topicElement.querySelectorAll('h2, h3, h4');
@@ -489,11 +509,64 @@
                 
                 let elementsForEpigrafe = [startElement];
                 let nextElement = startElement.nextElementSibling;
-                while (nextElement && !['H2', 'H3', 'H4'].includes(nextElement.tagName)) {
+                while (nextElement && !['H2', 'H3', 'H4'].includes(nextElement.tagName.toUpperCase())) {
                     elementsForEpigrafe.push(nextElement);
                     nextElement = nextElement.nextElementSibling;
                 }
                 return elementsForEpigrafe;
+            }
+
+            function populateParagraphSelect() {
+                paragraphSelect.innerHTML = '';
+                if(paragraphs.length > 0){
+                    paragraphs.forEach((p, index) => {
+                        const option = document.createElement('option');
+                        option.value = index;
+                        const snippet = p.text.length > 60 ? p.text.substring(0, 60) + '...' : p.text;
+                        option.textContent = `Párrafo ${index + 1}: ${snippet}`;
+                        if (p.tagName.startsWith('H')) {
+                            option.classList.add('font-bold', 'text-black');
+                        }
+                        paragraphSelect.appendChild(option);
+                    });
+                    paragraphSelect.disabled = false;
+                } else {
+                    paragraphSelect.disabled = true;
+                }
+            }
+            
+            function createParagraphElement(content, tagName, index) {
+                const wrapper = document.createElement('div');
+                wrapper.dataset.index = index;
+                wrapper.className = 'mb-1';
+                const newElement = document.createElement(tagName === 'LI' ? 'p' : tagName.toLowerCase());
+                newElement.className = 'p-2 transition-colors duration-200';
+                
+                if (tagName.startsWith('H')) newElement.className += ' font-bold text-xl text-gray-800 border-b-2 mt-4';
+                else if (tagName === 'LI') newElement.className += ' flex items-start';
+                
+                const textContainer = document.createElement('span');
+                
+                const wordsAndSpaces = content.split(/(\s+)/);
+                wordsAndSpaces.forEach(part => {
+                    if (part.trim() !== '') {
+                        const span = document.createElement('span');
+                        span.textContent = part;
+                        textContainer.appendChild(span);
+                    } else {
+                        textContainer.appendChild(document.createTextNode(part));
+                    }
+                });
+
+                if (tagName === 'LI') {
+                    newElement.innerHTML = `<span class="mr-3 text-blue-600 self-center flex-shrink-0">&bull;</span>`;
+                    newElement.appendChild(textContainer);
+                } else {
+                    newElement.appendChild(textContainer);
+                }
+                
+                wrapper.appendChild(newElement);
+                textReaderDisplay.appendChild(wrapper);
             }
 
             function startPlaybackQueue() {
@@ -507,90 +580,48 @@
                 playCurrentParagraph();
             }
 
-            function playCurrentParagraph() {
+             function playCurrentParagraph() {
                 if (stopRequested) {
-                    log('Reproducción detenida por petición.');
                     resetState();
                     return;
                 }
 
                 if (currentParagraphIndex >= paragraphs.length) {
-                    if(isLooping) {
-                        log('Fin de la selección, reiniciando en bucle.');
+                    if (isLooping) {
                         currentParagraphIndex = 0;
                         currentRepetition = 0;
                         setTimeout(() => playCurrentParagraph(), 50);
                     } else {
-                        log('Se ha llegado al final del temario.');
                         stopReadingInternal(true);
                         readerStatus.textContent = "Lectura completada.";
                     }
                     return;
                 }
                 
-                log(`Intentando reproducir párrafo ${currentParagraphIndex}.`);
                 paragraphSelect.value = currentParagraphIndex;
                 const textToSpeak = paragraphs[currentParagraphIndex].text;
                 utterance = new SpeechSynthesisUtterance(textToSpeak);
                 utterance.rate = currentSpeechRate;
                 
-                const spanishVoice = voices.find(v => v.lang.startsWith('es'));
-                if (spanishVoice) {
-                    utterance.voice = spanishVoice;
-                } else {
-                    utterance.lang = 'es-ES';
-                }
+                const spanishVoice = voices.find(v => v.lang.startsWith('es-ES') || v.lang.startsWith('es-MX'));
+                utterance.voice = spanishVoice || voices.find(v => v.lang.startsWith('es')) || null;
+                utterance.lang = utterance.voice ? utterance.voice.lang : 'es-ES';
 
                 utterance.onstart = () => {
-                    log(`onstart: Empezó a hablar el párrafo ${currentParagraphIndex}`);
                     isSpeaking = true; isPaused = false; stopRequested = false;
-                    
-                    if (lastHighlightedParagraph) {
-                        lastHighlightedParagraph.classList.remove('paragraph-highlight');
-                    }
-                    const paragraphElement = textReaderDisplay.querySelector(`[data-index="${currentParagraphIndex}"]`);
-                    if (paragraphElement) {
-                        paragraphElement.classList.add('paragraph-highlight');
-                        paragraphElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        lastHighlightedParagraph = paragraphElement;
-                    }
-                    
+                    highlightCurrentParagraph();
                     updateUIState('speaking'); 
                 };
-                utterance.onpause = () => { 
-                    log(`onpause: Pausado en el párrafo ${currentParagraphIndex}`);
-                    isPaused = true; updateUIState('paused'); 
-                };
-                utterance.onresume = () => { 
-                    log(`onresume: Reanudado en el párrafo ${currentParagraphIndex}`);
-                    isPaused = false; updateUIState('speaking'); 
-                };
-                
-                utterance.onboundary = (event) => {
-                    if (event.name !== 'word' || stopRequested) return;
-                    if (lastHighlightedSpan) lastHighlightedSpan.classList.remove('highlight');
-                    
-                    const paragraphElement = textReaderDisplay.querySelector(`[data-index="${currentParagraphIndex}"] > *`);
-                    if (!paragraphElement) return;
-
-                    const currentWordSpan = findSpanInParagraph(paragraphElement, event.charIndex);
-                    
-                    if (currentWordSpan) {
-                        currentWordSpan.classList.add('highlight');
-                        lastHighlightedSpan = currentWordSpan;
-                    }
-                };
+                utterance.onpause = () => { isPaused = true; updateUIState('paused'); };
+                utterance.onresume = () => { isPaused = false; updateUIState('speaking'); };
+                utterance.onboundary = handleWordBoundary;
 
                 utterance.onend = () => {
-                    log(`onend: Terminado el párrafo ${currentParagraphIndex}.`);
                     if (stopRequested || seekInProgress) return;
                     currentRepetition++;
+                    if (lastHighlightedSpan) lastHighlightedSpan.classList.remove('highlight');
+                    
                     const totalRepetitions = parseInt(repeatSelect.value, 10);
-                    if (lastHighlightedSpan) {
-                       lastHighlightedSpan.classList.remove('highlight');
-                       lastHighlightedSpan = null;
-                    }
-
                     if (currentRepetition < totalRepetitions) {
                          setTimeout(() => playCurrentParagraph(), 50);
                     } else {
@@ -601,16 +632,45 @@
                 };
                 
                 utterance.onerror = (e) => {
-                    if (e.error === 'interrupted' || e.error === 'canceled') {
-                        log(`Error de síntesis de voz (esperado): ${e.error}`);
-                        return;
+                    if (!['interrupted', 'canceled'].includes(e.error)) {
+                        log(`Error de síntesis de voz: ${e.error}`);
+                        readerStatus.textContent = `Error: ${e.error}`;
+                        stopReadingInternal(true);
                     }
-                    log(`Error de síntesis de voz (inesperado): ${e.error}`);
-                    readerStatus.textContent = `Error: ${e.error}`;
-                    stopReadingInternal(true);
                 };
                 
                 speechSynthesis.speak(utterance);
+            }
+            
+            function handleWordBoundary(event) {
+                if (event.name !== 'word' || stopRequested) return;
+                if (lastHighlightedSpan) lastHighlightedSpan.classList.remove('highlight');
+                
+                const paragraphElement = textReaderDisplay.querySelector(`[data-index="${currentParagraphIndex}"] > * > span`);
+                if (!paragraphElement) return;
+
+                let charCount = 0;
+                for(const span of paragraphElement.children) {
+                    const textLength = span.textContent.length;
+                    const nextNode = span.nextSibling;
+                    const spaceLength = (nextNode && nextNode.nodeType === Node.TEXT_NODE) ? nextNode.textContent.length : 0;
+                    if (event.charIndex >= charCount && event.charIndex < charCount + textLength) {
+                        span.classList.add('highlight');
+                        lastHighlightedSpan = span;
+                        break;
+                    }
+                    charCount += textLength + spaceLength;
+                }
+            }
+            
+            function highlightCurrentParagraph() {
+                if (lastHighlightedParagraph) lastHighlightedParagraph.classList.remove('paragraph-highlight');
+                const paragraphElement = textReaderDisplay.querySelector(`[data-index="${currentParagraphIndex}"]`);
+                if (paragraphElement) {
+                    paragraphElement.classList.add('paragraph-highlight');
+                    paragraphElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    lastHighlightedParagraph = paragraphElement;
+                }
             }
             
             function seek(direction) {
@@ -630,46 +690,95 @@
                     seekInProgress = false;
                 }
             }
-            
-            function findSpanInParagraph(paragraphElement, charIndex) {
-                 let spans = [];
-                 if(paragraphElement.querySelector('span.flex-1')) {
-                    spans = paragraphElement.querySelector('span.flex-1').querySelectorAll('span');
-                 } else {
-                    spans = paragraphElement.querySelectorAll('span');
-                 }
 
-                 let accumulatedLength = 0;
-                 for (const span of spans) {
-                    const word = span.textContent;
-                    const nextAccumulatedLength = accumulatedLength + word.length;
-                    if(charIndex >= accumulatedLength && charIndex < nextAccumulatedLength) {
-                        return span;
-                    }
-                    let nextNode = span.nextSibling;
-                    let spaceLength = (nextNode && nextNode.nodeType === Node.TEXT_NODE) ? nextNode.textContent.length : 0;
-                    accumulatedLength = nextAccumulatedLength + spaceLength;
-                 }
-                 return null;
+            function toggleLoop() {
+                isLooping = !isLooping;
+                loopBtn.classList.toggle('bg-blue-600', isLooping);
+                loopBtn.classList.toggle('text-white', isLooping);
+                loopBtn.classList.toggle('bg-gray-200', !isLooping);
+                loopBtn.classList.toggle('text-gray-700', !isLooping);
+            }
+
+            function increaseSpeed() {
+                if (currentSpeechRate < maxSpeechRate) {
+                    currentSpeechRate = Math.min(maxSpeechRate, parseFloat((currentSpeechRate + speechRateIncrement).toFixed(2)));
+                    updateSpeedDisplay();
+                }
             }
             
-            function updateUIState(state) {
+            function decreaseSpeed() {
+                if (currentSpeechRate > minSpeechRate) {
+                    currentSpeechRate = Math.max(minSpeechRate, parseFloat((currentSpeechRate - speechRateIncrement).toFixed(2)));
+                    updateSpeedDisplay();
+                }
+            }
+            
+            function updateSpeedDisplay() {
+                currentSpeedDisplay.textContent = `${currentSpeechRate.toFixed(2)}x`;
+                if (utterance) utterance.rate = currentSpeechRate;
+            }
+            
+            function toggleTextDisplaySize() {
+                textReaderDisplayWrapper.classList.toggle('expanded');
+                const icon = toggleTextDisplaySizeBtn.querySelector('i');
+                icon.className = textReaderDisplayWrapper.classList.contains('expanded') ? 'fas fa-compress-alt' : 'fas fa-expand-alt';
+                toggleTextDisplaySizeBtn.title = textReaderDisplayWrapper.classList.contains('expanded') ? 'Contraer Texto' : 'Expandir Texto';
+            }
+
+            function resetPlayerUI() {
+                topicSelect.innerHTML = '';
+                epigrafeSelect.innerHTML = '';
+                paragraphSelect.innerHTML = '';
+                textReaderDisplay.innerHTML = '';
+                
+                epigrafeSelect.disabled = true;
+                paragraphSelect.disabled = true;
+
+                paragraphs = [];
+                temarioDoc = null;
+                currentParagraphIndex = 0;
+                currentRepetition = 0;
+                
+                updateProgressBar();
+                resetState();
+            }
+            
+            function resetParagraphs() {
+                paragraphs = [];
+                paragraphSelect.innerHTML = '';
+                paragraphSelect.disabled = true;
+                textReaderDisplay.innerHTML = '<p class="text-gray-500 text-center p-8">No hay contenido que mostrar para esta selección.</p>';
+            }
+
+            function resetState() {
+                 isSpeaking = false;
+                 isPaused = false;
+                 stopRequested = false;
+                 if (lastHighlightedSpan) lastHighlightedSpan.classList.remove('highlight');
+                 if (lastHighlightedParagraph) lastHighlightedParagraph.classList.remove('paragraph-highlight');
+                 lastHighlightedSpan = null;
+                 lastHighlightedParagraph = null;
+                 updateUIState('idle');
+            }
+
+             function updateUIState(state) {
                 isSpeaking = (state === 'speaking' || state === 'paused');
                 isPaused = (state === 'paused');
-                const hasContent = temarioDoc && paragraphs.length > 0;
+                const hasContent = paragraphs.length > 0;
 
                 playPauseBtn.disabled = !hasContent || !voicesReady;
                 speedUpBtn.disabled = !hasContent;
                 speedDownBtn.disabled = !hasContent;
-                rewindBtn.disabled = !isSpeaking || (currentParagraphIndex === 0 && currentRepetition === 0);
-                forwardBtn.disabled = !isSpeaking || (currentParagraphIndex >= paragraphs.length - 1);
+                rewindBtn.disabled = !isSpeaking || currentParagraphIndex === 0;
+                forwardBtn.disabled = !isSpeaking || currentParagraphIndex >= paragraphs.length - 1;
                 
                 switch(state) {
                     case 'idle':
+                    case 'error':
                         playPauseIcon.className = 'fas fa-play';
                         playPauseBtn.title = 'Leer';
                         speakerIcon.classList.remove('speaker-active');
-                        updateProgressBar();
+                        if(state === 'idle') updateProgressBar();
                         break;
                     case 'speaking':
                         playPauseIcon.className = 'fas fa-pause';
@@ -690,60 +799,10 @@
                 progressBar.style.width = `${progress}%`;
                 progressText.textContent = `${Math.round(progress)}%`;
             }
-            
-            function toggleTextDisplaySize() {
-                textReaderDisplayWrapper.classList.toggle('expanded');
-                const icon = toggleTextDisplaySizeBtn.querySelector('i');
-                if (textReaderDisplayWrapper.classList.contains('expanded')) {
-                    icon.className = 'fas fa-compress-alt';
-                    toggleTextDisplaySizeBtn.title = 'Contraer Texto';
-                } else {
-                    icon.className = 'fas fa-expand-alt';
-                    toggleTextDisplaySizeBtn.title = 'Expandir Texto';
-                }
-            }
 
-            function increaseSpeed() {
-                if (currentSpeechRate < maxSpeechRate) {
-                    currentSpeechRate = Math.min(maxSpeechRate, parseFloat((currentSpeechRate + speechRateIncrement).toFixed(2)));
-                    updateSpeedDisplay();
-                }
-            }
-
-            function decreaseSpeed() {
-                if (currentSpeechRate > minSpeechRate) {
-                    currentSpeechRate = Math.max(minSpeechRate, parseFloat((currentSpeechRate - speechRateIncrement).toFixed(2)));
-                    updateSpeedDisplay();
-                }
-            }
-            
-            function updateSpeedDisplay() {
-                currentSpeedDisplay.textContent = `${currentSpeechRate.toFixed(2)}x`;
-                if (utterance) utterance.rate = currentSpeechRate;
-            }
-            
-            window.onbeforeunload = () => {
-                speechSynthesis.cancel();
-            };
-
-            function resetState() {
-                 isSpeaking = false;
-                 isPaused = false;
-                 stopRequested = false;
-                 if (lastHighlightedSpan) {
-                     lastHighlightedSpan.classList.remove('highlight');
-                     lastHighlightedSpan = null;
-                 }
-                 if (lastHighlightedParagraph) {
-                    lastHighlightedParagraph.classList.remove('paragraph-highlight');
-                    lastHighlightedParagraph = null;
-                 }
-                 updateUIState('idle');
-            }
-            
-            initialize();
+            // Iniciar la aplicación
+            initializeApp();
         });
     </script>
 </body>
 </html>
-
