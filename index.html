@@ -4,8 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lector de Temarios por Bloques</title>
+    <!-- Tailwind CSS para un diseño moderno -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Iconos de Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <!-- Fuente Inter de Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
@@ -85,12 +88,15 @@
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
 
+    <!-- Pantalla de Selección de Bloque -->
     <div id="selection-screen" class="w-full max-w-4xl text-center">
         <h1 class="text-4xl md:text-5xl font-bold text-gray-900 mb-8">Selecciona un Bloque Temático</h1>
         <div id="bloque-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            </div>
+            <!-- Las tarjetas de bloque se generarán aquí con JavaScript -->
+        </div>
     </div>
 
+    <!-- Pantalla del Reproductor (inicialmente oculta) -->
     <div id="player-screen" class="w-full max-w-6xl bg-white rounded-xl shadow-2xl p-6 md:p-8 hidden">
         <div class="flex justify-between items-center mb-4">
              <button id="back-to-selection-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors">
@@ -103,7 +109,8 @@
                     <i class="fas fa-volume-up"></i>
                 </div>
             </div>
-             <div class="w-24"></div> </div>
+             <div class="w-24"></div> <!-- Espaciador para centrar el título -->
+        </div>
         
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
             <div>
@@ -176,27 +183,26 @@
             }
 
             // --- CONFIGURACIÓN DE BLOQUES ---
-            // Añade aquí nuevos bloques. El nombre del archivo debe coincidir con el que subas a GitHub.
             const BLOQUES = [
-                { nombre: "Administrativo y Aguas", archivo: "Temario_Adm.html", icono: "fa-gavel" },
+                { nombre: "Administrativo", archivo: "Temario_Adm.html", icono: "fa-gavel" },
+                { nombre: "Aguas", archivo: "Temario_Ag.html", icono: "fa-tint" },
                 { nombre: "Costas", archivo: "Temario_Cos.html", icono: "fa-water" },
                 { nombre: "Carreteras", archivo: "Temario_Carr.html", icono: "fa-road" },
                 { nombre: "Ferrocarriles", archivo: "Temario_F.html", icono: "fa-train" },
                 { nombre: "Transportes", archivo: "Temario_T.html", icono: "fa-bus" },
                 { nombre: "Medio Ambiente", archivo: "Temario_MA.html", icono: "fa-leaf" },
-                { nombre: "Aguas", archivo: "Temario_Ag.html", icono: "fa-tint" },
             ];
             
-            // Reemplaza esta URL con la ruta base de tu repositorio de GitHub
-            const GITHUB_BASE_URL = 'https://raw.githubusercontent.com/cheradra312/MA_1-15/main/';
+            // --- CORRECCIÓN ---
+            // Se usa una ruta relativa ('./') para que funcione correctamente en GitHub Pages.
+            // Los archivos Temario_*.html deben estar en la misma carpeta que este archivo index.html.
+            const GITHUB_BASE_URL = './';
 
             // --- ELEMENTOS DEL DOM ---
             const selectionScreen = document.getElementById('selection-screen');
             const playerScreen = document.getElementById('player-screen');
             const bloqueContainer = document.getElementById('bloque-container');
             const backToSelectionBtn = document.getElementById('back-to-selection-btn');
-
-            // Elementos del reproductor
             const playerTitle = document.getElementById('player-title');
             const topicSelect = document.getElementById('topic-select');
             const epigrafeSelect = document.getElementById('epigrafe-select');
@@ -244,14 +250,10 @@
             function initializeApp() {
                 createSelectionCards();
                 setupEventListeners();
-                
-                // Cargar voces del navegador
                 if (speechSynthesis.onvoiceschanged !== undefined) {
                     speechSynthesis.onvoiceschanged = populateVoiceList;
                 }
                 populateVoiceList();
-                
-                // Reactivación periódica del motor de voz
                 setInterval(speechReactivation, 3000); 
             }
             
@@ -272,11 +274,8 @@
             }
 
             function setupEventListeners() {
-                // Navegación entre pantallas
                 bloqueContainer.addEventListener('click', handleBloqueSelection);
                 backToSelectionBtn.addEventListener('click', handleBackToSelection);
-
-                // Controles del reproductor
                 topicSelect.addEventListener('change', updateEpigrafeSelect);
                 epigrafeSelect.addEventListener('change', () => prepareAndDisplayText(true));
                 paragraphSelect.addEventListener('change', () => {
@@ -288,7 +287,6 @@
                         updateProgressBar();
                     }
                 });
-
                 playPauseBtn.addEventListener('click', handlePlayPause);
                 rewindBtn.addEventListener('click', () => seek(-1));
                 forwardBtn.addEventListener('click', () => seek(1));
@@ -296,7 +294,6 @@
                 speedDownBtn.addEventListener('click', decreaseSpeed);
                 toggleTextDisplaySizeBtn.addEventListener('click', toggleTextDisplaySize);
                 loopBtn.addEventListener('click', toggleLoop);
-                
                 window.onbeforeunload = () => {
                     speechSynthesis.cancel();
                 };
@@ -307,10 +304,8 @@
                 if (card) {
                     const url = card.dataset.url;
                     const nombre = card.dataset.nombre;
-                    
                     selectionScreen.classList.add('hidden');
                     playerScreen.classList.remove('hidden');
-                    
                     playerTitle.textContent = `Lector: ${nombre}`;
                     initializePlayer(url);
                 }
@@ -325,12 +320,12 @@
 
             async function initializePlayer(url) {
                 loadingSpinner.classList.remove('hidden');
-                readerStatus.textContent = `Cargando temario desde GitHub...`;
+                readerStatus.textContent = `Cargando temario...`;
                 resetPlayerUI();
                 
                 try {
                     const response = await fetch(url);
-                    if (!response.ok) throw new Error(`Error de red: ${response.statusText}`);
+                    if (!response.ok) throw new Error(`Error de red: ${response.statusText}. Asegúrate de que el archivo '${url}' existe en el repositorio.`);
                     const htmlText = await response.text();
                     const parser = new DOMParser();
                     temarioDoc = parser.parseFromString(htmlText, "text/html");
@@ -338,6 +333,12 @@
                     const topicElements = temarioDoc.querySelectorAll('body > section[id], body > div[id]');
                     topicSelect.innerHTML = '';
                     
+                    if (topicElements.length === 0) {
+                        readerStatus.textContent = "No se encontraron temas en el archivo.";
+                        updateUIState('error');
+                        return;
+                    }
+
                     topicElements.forEach(element => {
                         const option = document.createElement('option');
                         option.value = element.id;
@@ -347,10 +348,10 @@
                     
                     updateEpigrafeSelect();
                     updateUIState('idle');
-                    readerStatus.textContent = "Temario cargado. Selecciona un tema y epígrafe.";
+                    readerStatus.textContent = "Temario cargado. Selecciona un tema.";
                 } catch (error) {
                     log("Error fatal al cargar el temario:", error);
-                    readerStatus.textContent = "No se pudo cargar el temario.";
+                    readerStatus.textContent = `Error al cargar: ${error.message}`;
                     updateUIState('error');
                 } finally {
                     loadingSpinner.classList.add('hidden');
@@ -413,7 +414,7 @@
                 textReaderDisplay.innerHTML = '';
                 paragraphs = [];
                 
-                if (!elements) {
+                if (!elements || elements.length === 0) {
                     resetParagraphs();
                     return;
                 };
@@ -481,10 +482,6 @@
                    resetState();
                 }
             }
-
-            // ... (resto de funciones del reproductor: getElementsForSelection, startPlaybackQueue, playCurrentParagraph, etc.)
-            // Las funciones internas del reproductor se mantienen, ya que la lógica principal de la selección de contenido está separada.
-            // He pegado las funciones clave abajo para asegurar la integridad del script.
 
             function getElementsForSelection() {
                 const topicId = topicSelect.value;
