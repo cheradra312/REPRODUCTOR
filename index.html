@@ -193,9 +193,6 @@
                 { nombre: "Medio Ambiente", archivo: "Temario_MA.html", icono: "fa-leaf" },
             ];
             
-            // --- CORRECCIÓN ---
-            // Se usa una ruta relativa ('./') para que funcione correctamente en GitHub Pages.
-            // Los archivos Temario_*.html deben estar en la misma carpeta que este archivo index.html.
             const GITHUB_BASE_URL = './';
 
             // --- ELEMENTOS DEL DOM ---
@@ -325,12 +322,14 @@
                 
                 try {
                     const response = await fetch(url);
-                    if (!response.ok) throw new Error(`Error de red: ${response.statusText}. Asegúrate de que el archivo '${url}' existe en el repositorio.`);
+                    if (!response.ok) throw new Error(`Error de red: ${response.statusText}. Asegúrate de que el archivo '${url}' existe.`);
                     const htmlText = await response.text();
                     const parser = new DOMParser();
                     temarioDoc = parser.parseFromString(htmlText, "text/html");
                     
-                    const topicElements = temarioDoc.querySelectorAll('body > section[id], body > div[id]');
+                    // --- CORRECCIÓN ---
+                    // Se buscan los elementos en todo el body, no solo como hijos directos.
+                    const topicElements = temarioDoc.querySelectorAll('section[id], div[id]');
                     topicSelect.innerHTML = '';
                     
                     if (topicElements.length === 0) {
