@@ -84,6 +84,24 @@
             from { transform: scale(1); opacity: 1; }
             to { transform: scale(1.2); opacity: 0.8; }
         }
+        /* Estilos para la nueva lista de epígrafes */
+        .epigrafe-item {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: background-color 0.2s;
+        }
+        .epigrafe-item:hover {
+            background-color: #e5e7eb; /* gray-200 */
+        }
+        .epigrafe-item.selected {
+            background-color: #dbeafe; /* blue-100 */
+            color: #1e40af; /* blue-800 */
+            font-weight: 500;
+        }
     </style>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
@@ -100,16 +118,16 @@
     <div id="player-screen" class="w-full max-w-6xl bg-white rounded-xl shadow-2xl p-6 md:p-8 hidden">
         <div class="flex justify-between items-center mb-4">
              <button id="back-to-selection-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors">
-                <i class="fas fa-arrow-left"></i>
-                Volver
-            </button>
-            <div class="text-center flex flex-col items-center flex-grow">
+                 <i class="fas fa-arrow-left"></i>
+                 Volver
+             </button>
+             <div class="text-center flex flex-col items-center flex-grow">
                  <h1 id="player-title" class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Lector de Temario</h1>
                  <div id="speaker-icon" class="text-gray-400 text-2xl transition-colors duration-300">
-                    <i class="fas fa-volume-up"></i>
-                </div>
-            </div>
-             <div class="w-24"></div> <!-- Espaciador para centrar el título -->
+                     <i class="fas fa-volume-up"></i>
+                 </div>
+             </div>
+              <div class="w-24"></div> <!-- Espaciador para centrar el título -->
         </div>
         
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
@@ -118,11 +136,13 @@
                 <select id="topic-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"></select>
             </div>
             <div>
-                <label for="epigrafe-select" class="block mb-2 text-sm font-medium text-gray-700">Epígrafe:</label>
-                <select id="epigrafe-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" disabled></select>
+                <label for="epigrafe-list" class="block mb-2 text-sm font-medium text-gray-700">Epígrafes (selecciona uno o más):</label>
+                <div id="epigrafe-list" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5 h-32 overflow-y-auto">
+                    <!-- Los epígrafes con checkboxes se generarán aquí -->
+                </div>
             </div>
              <div>
-                <label for="paragraph-select" class="block mb-2 text-sm font-medium text-gray-700">Párrafo:</label>
+                <label for="paragraph-select" class="block mb-2 text-sm font-medium text-gray-700">Párrafo de inicio:</label>
                 <select id="paragraph-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" disabled></select>
             </div>
         </div>
@@ -161,7 +181,7 @@
                 <button id="speed-up-btn" title="Aumentar Velocidad" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center" disabled><i class="fas fa-plus"></i></button>
             </div>
              <button id="toggle-text-display-size" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center" title="Expandir Texto">
-               <i class="fas fa-expand-alt"></i>
+                <i class="fas fa-expand-alt"></i>
             </button>
         </div>
         
@@ -202,7 +222,7 @@
             const backToSelectionBtn = document.getElementById('back-to-selection-btn');
             const playerTitle = document.getElementById('player-title');
             const topicSelect = document.getElementById('topic-select');
-            const epigrafeSelect = document.getElementById('epigrafe-select');
+            const epigrafeList = document.getElementById('epigrafe-list');
             const paragraphSelect = document.getElementById('paragraph-select');
             const playPauseBtn = document.getElementById('play-pause-btn');
             const playPauseIcon = document.getElementById('play-pause-icon');
@@ -273,8 +293,8 @@
             function setupEventListeners() {
                 bloqueContainer.addEventListener('click', handleBloqueSelection);
                 backToSelectionBtn.addEventListener('click', handleBackToSelection);
-                topicSelect.addEventListener('change', updateEpigrafeSelect);
-                epigrafeSelect.addEventListener('change', () => prepareAndDisplayText(true));
+                topicSelect.addEventListener('change', updateEpigrafeList);
+                epigrafeList.addEventListener('change', () => prepareAndDisplayText(true));
                 paragraphSelect.addEventListener('change', () => {
                     currentParagraphIndex = parseInt(paragraphSelect.value, 10);
                     if (isSpeaking) {
@@ -327,8 +347,6 @@
                     const parser = new DOMParser();
                     temarioDoc = parser.parseFromString(htmlText, "text/html");
                     
-                    // --- CORRECCIÓN ---
-                    // Se buscan los elementos en todo el body, no solo como hijos directos.
                     const topicElements = temarioDoc.querySelectorAll('section[id], div[id]');
                     topicSelect.innerHTML = '';
                     
@@ -345,7 +363,7 @@
                         topicSelect.appendChild(option);
                     });
                     
-                    updateEpigrafeSelect();
+                    updateEpigrafeList();
                     updateUIState('idle');
                     readerStatus.textContent = "Temario cargado. Selecciona un tema.";
                 } catch (error) {
@@ -376,33 +394,63 @@
                 }
             }
             
-            function updateEpigrafeSelect() {
+            function updateEpigrafeList() {
                 stopReadingInternal(true);
                 const topicId = topicSelect.value;
                 
-                epigrafeSelect.innerHTML = '';
-                if (!temarioDoc || !topicId) {
-                    epigrafeSelect.disabled = true;
-                } else {
-                    const topicElement = temarioDoc.querySelector(`#${topicId}`);
-                    if (topicElement) {
-                        const allOption = document.createElement('option');
-                        allOption.value = 'all';
-                        allOption.textContent = 'Tema Completo';
-                        epigrafeSelect.appendChild(allOption);
-                        
-                        const epigrafes = topicElement.querySelectorAll('h2, h3, h4');
-                        epigrafes.forEach((h, index) => {
-                            const option = document.createElement('option');
-                            option.value = index;
-                            option.textContent = h.textContent.trim();
-                            epigrafeSelect.appendChild(option);
-                        });
-                        epigrafeSelect.disabled = false;
-                    } else {
-                       epigrafeSelect.disabled = true;
-                    }
-                }
+                epigrafeList.innerHTML = '';
+                if (!temarioDoc || !topicId) return;
+
+                const topicElement = temarioDoc.querySelector(`#${topicId}`);
+                if (!topicElement) return;
+
+                const epigrafes = topicElement.querySelectorAll('h2, h3, h4');
+
+                // Añadir opción "Seleccionar Todo"
+                const selectAllLabel = document.createElement('label');
+                selectAllLabel.className = 'epigrafe-item block font-semibold border-b border-gray-300 mb-1';
+                selectAllLabel.innerHTML = `
+                    <input type="checkbox" id="select-all-epigrafes" class="mr-2 rounded text-blue-600 focus:ring-blue-500">
+                    <span>Tema Completo / Seleccionar Todo</span>
+                `;
+                epigrafeList.appendChild(selectAllLabel);
+
+                epigrafes.forEach((h, index) => {
+                    const label = document.createElement('label');
+                    label.className = 'epigrafe-item block';
+                    label.dataset.index = index;
+                    label.innerHTML = `
+                        <input type="checkbox" class="epigrafe-checkbox mr-2 rounded text-blue-600 focus:ring-blue-500">
+                        <span>${h.textContent.trim()}</span>
+                    `;
+                    epigrafeList.appendChild(label);
+                });
+
+                // Lógica para "Seleccionar Todo"
+                const selectAllCheckbox = document.getElementById('select-all-epigrafes');
+                const allEpigrafeCheckboxes = epigrafeList.querySelectorAll('.epigrafe-checkbox');
+
+                selectAllCheckbox.addEventListener('change', (e) => {
+                    allEpigrafeCheckboxes.forEach(cb => cb.checked = e.target.checked);
+                    // Disparamos el evento change en la lista para que se actualice el texto
+                    epigrafeList.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+
+                epigrafeList.addEventListener('change', () => {
+                    const allChecked = [...allEpigrafeCheckboxes].every(cb => cb.checked);
+                    selectAllCheckbox.checked = allChecked;
+                    
+                    // Actualizar estilos visuales
+                    epigrafeList.querySelectorAll('.epigrafe-item').forEach(item => {
+                        const checkbox = item.querySelector('input[type="checkbox"]');
+                        if (checkbox && checkbox.checked) {
+                            item.classList.add('selected');
+                        } else {
+                            item.classList.remove('selected');
+                        }
+                    });
+                });
+
                 prepareAndDisplayText();
             }
 
@@ -443,7 +491,7 @@
                 updateUIState('idle');
             }
 
-             function handlePlayPause() {
+            function handlePlayPause() {
                 log('handlePlayPause called.', { isPaused, isSpeaking });
                 
                 if (!voicesReady){
@@ -484,32 +532,40 @@
 
             function getElementsForSelection() {
                 const topicId = topicSelect.value;
-                const epigrafeIndexStr = epigrafeSelect.value;
-                
                 if (!temarioDoc || !topicId) return null;
 
                 const topicElement = temarioDoc.querySelector(`#${topicId}`);
                 if (!topicElement) return null;
 
-                if (epigrafeIndexStr === 'all' || epigrafeIndexStr === null || epigrafeIndexStr === "") {
+                const selectAllCheckbox = document.getElementById('select-all-epigrafes');
+                if (selectAllCheckbox && selectAllCheckbox.checked) {
                     return Array.from(topicElement.querySelectorAll('h1,h2,h3,h4,h5,h6,p,ul,ol'));
                 }
-                
+
+                const selectedCheckboxes = epigrafeList.querySelectorAll('.epigrafe-checkbox:checked');
+                if (selectedCheckboxes.length === 0) return null;
+
                 const allHeadings = topicElement.querySelectorAll('h2, h3, h4');
-                const startIndex = parseInt(epigrafeIndexStr, 10);
+                const elementsForEpigrafe = new Set();
 
-                if (isNaN(startIndex)) return null;
+                selectedCheckboxes.forEach(checkbox => {
+                    const label = checkbox.closest('.epigrafe-item');
+                    const index = parseInt(label.dataset.index, 10);
+                    
+                    if (isNaN(index)) return;
 
-                const startElement = allHeadings[startIndex];
-                if (!startElement) return null;
+                    const startElement = allHeadings[index];
+                    if (!startElement) return;
+                    
+                    elementsForEpigrafe.add(startElement);
+                    let nextElement = startElement.nextElementSibling;
+                    while (nextElement && !['H2', 'H3', 'H4'].includes(nextElement.tagName.toUpperCase())) {
+                        elementsForEpigrafe.add(nextElement);
+                        nextElement = nextElement.nextElementSibling;
+                    }
+                });
                 
-                let elementsForEpigrafe = [startElement];
-                let nextElement = startElement.nextElementSibling;
-                while (nextElement && !['H2', 'H3', 'H4'].includes(nextElement.tagName.toUpperCase())) {
-                    elementsForEpigrafe.push(nextElement);
-                    nextElement = nextElement.nextElementSibling;
-                }
-                return elementsForEpigrafe;
+                return Array.from(elementsForEpigrafe);
             }
 
             function populateParagraphSelect() {
@@ -576,7 +632,7 @@
                 playCurrentParagraph();
             }
 
-             function playCurrentParagraph() {
+            function playCurrentParagraph() {
                 if (stopRequested) {
                     resetState();
                     return;
@@ -711,7 +767,17 @@
             
             function updateSpeedDisplay() {
                 currentSpeedDisplay.textContent = `${currentSpeechRate.toFixed(2)}x`;
-                if (utterance) utterance.rate = currentSpeechRate;
+                if (utterance && isSpeaking) {
+                    // To change speed mid-speech, we have to stop and restart
+                    const wasPaused = isPaused;
+                    stopReadingInternal();
+                    setTimeout(() => {
+                        playCurrentParagraph();
+                        if (wasPaused) {
+                           setTimeout(() => speechSynthesis.pause(), 50);
+                        }
+                    }, 150);
+                }
             }
             
             function toggleTextDisplaySize() {
@@ -723,11 +789,10 @@
 
             function resetPlayerUI() {
                 topicSelect.innerHTML = '';
-                epigrafeSelect.innerHTML = '';
+                epigrafeList.innerHTML = '';
                 paragraphSelect.innerHTML = '';
                 textReaderDisplay.innerHTML = '';
                 
-                epigrafeSelect.disabled = true;
                 paragraphSelect.disabled = true;
 
                 paragraphs = [];
@@ -743,7 +808,8 @@
                 paragraphs = [];
                 paragraphSelect.innerHTML = '';
                 paragraphSelect.disabled = true;
-                textReaderDisplay.innerHTML = '<p class="text-gray-500 text-center p-8">No hay contenido que mostrar para esta selección.</p>';
+                textReaderDisplay.innerHTML = '<p class="text-gray-500 text-center p-8">Selecciona uno o más epígrafes para mostrar su contenido.</p>';
+                updateUIState('idle');
             }
 
             function resetState() {
@@ -757,37 +823,37 @@
                  updateUIState('idle');
             }
 
-             function updateUIState(state) {
-                isSpeaking = (state === 'speaking' || state === 'paused');
-                isPaused = (state === 'paused');
-                const hasContent = paragraphs.length > 0;
+            function updateUIState(state) {
+                 isSpeaking = (state === 'speaking' || state === 'paused');
+                 isPaused = (state === 'paused');
+                 const hasContent = paragraphs.length > 0;
 
-                playPauseBtn.disabled = !hasContent || !voicesReady;
-                speedUpBtn.disabled = !hasContent;
-                speedDownBtn.disabled = !hasContent;
-                rewindBtn.disabled = !isSpeaking || currentParagraphIndex === 0;
-                forwardBtn.disabled = !isSpeaking || currentParagraphIndex >= paragraphs.length - 1;
-                
-                switch(state) {
-                    case 'idle':
-                    case 'error':
-                        playPauseIcon.className = 'fas fa-play';
-                        playPauseBtn.title = 'Leer';
-                        speakerIcon.classList.remove('speaker-active');
-                        if(state === 'idle') updateProgressBar();
-                        break;
-                    case 'speaking':
-                        playPauseIcon.className = 'fas fa-pause';
-                        playPauseBtn.title = 'Pausar';
-                        speakerIcon.classList.add('speaker-active');
-                        updateProgressBar();
-                        break;
-                    case 'paused':
-                        playPauseIcon.className = 'fas fa-play';
-                        playPauseBtn.title = 'Continuar';
-                        speakerIcon.classList.remove('speaker-active');
-                        break;
-                }
+                 playPauseBtn.disabled = !hasContent || !voicesReady;
+                 speedUpBtn.disabled = !hasContent;
+                 speedDownBtn.disabled = !hasContent;
+                 rewindBtn.disabled = !isSpeaking || currentParagraphIndex === 0;
+                 forwardBtn.disabled = !isSpeaking || currentParagraphIndex >= paragraphs.length - 1;
+                 
+                 switch(state) {
+                     case 'idle':
+                     case 'error':
+                         playPauseIcon.className = 'fas fa-play';
+                         playPauseBtn.title = 'Leer';
+                         speakerIcon.classList.remove('speaker-active');
+                         if(state === 'idle') updateProgressBar();
+                         break;
+                     case 'speaking':
+                         playPauseIcon.className = 'fas fa-pause';
+                         playPauseBtn.title = 'Pausar';
+                         speakerIcon.classList.add('speaker-active');
+                         updateProgressBar();
+                         break;
+                     case 'paused':
+                         playPauseIcon.className = 'fas fa-play';
+                         playPauseBtn.title = 'Continuar';
+                         speakerIcon.classList.remove('speaker-active');
+                         break;
+                 }
             }
             
             function updateProgressBar() {
