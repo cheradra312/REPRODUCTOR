@@ -55,8 +55,16 @@
             position: relative; 
             transition: height 0.3s ease-in-out;
         }
-        #text-reader-display-wrapper.expanded {
-            height: 30rem;
+        /* Estilo para la vista de pantalla completa */
+        #text-reader-display-wrapper.fullscreen-view {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 50;
+            border-radius: 0;
+            height: 100%;
             overflow-y: auto;
         }
         select:disabled, button:disabled {
@@ -84,7 +92,7 @@
             from { transform: scale(1); opacity: 1; }
             to { transform: scale(1.2); opacity: 0.8; }
         }
-        /* Estilos para la nueva lista de epígrafes */
+        /* Estilos para la lista de epígrafes */
         .epigrafe-item {
             display: flex;
             align-items: center;
@@ -95,12 +103,26 @@
             transition: background-color 0.2s;
         }
         .epigrafe-item:hover {
-            background-color: #e5e7eb; /* gray-200 */
+            background-color: #f3f4f6; /* gray-100 */
         }
         .epigrafe-item.selected {
             background-color: #dbeafe; /* blue-100 */
             color: #1e40af; /* blue-800 */
             font-weight: 500;
+        }
+        #epigrafe-dropdown-btn.open .fa-chevron-down {
+            transform: rotate(180deg);
+        }
+        /* Estilos para secciones plegables */
+        .collapsible-button .fa-chevron-up {
+            transition: transform 0.3s ease;
+        }
+        .collapsible-button.closed .fa-chevron-up {
+            transform: rotate(180deg);
+        }
+        .collapsible-panel {
+            transition: max-height 0.3s ease-in-out, padding 0.3s ease-in-out;
+            overflow: hidden;
         }
     </style>
 </head>
@@ -130,20 +152,33 @@
               <div class="w-24"></div> <!-- Espaciador para centrar el título -->
         </div>
         
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-            <div>
-                <label for="topic-select" class="block mb-2 text-sm font-medium text-gray-700">Tema:</label>
-                <select id="topic-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"></select>
-            </div>
-            <div>
-                <label for="epigrafe-list" class="block mb-2 text-sm font-medium text-gray-700">Epígrafes (selecciona uno o más):</label>
-                <div id="epigrafe-list" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5 h-32 overflow-y-auto">
-                    <!-- Los epígrafes con checkboxes se generarán aquí -->
+        <!-- Sección de Selección Plegable -->
+        <div class="border rounded-lg mb-4 bg-white shadow-sm">
+            <button id="selection-toggle-btn" class="collapsible-button w-full flex justify-between items-center p-3 text-left font-semibold text-gray-700 hover:bg-gray-50 rounded-t-lg">
+                <span>Configuración de Selección</span>
+                <i class="fas fa-chevron-up"></i>
+            </button>
+            <div id="selection-panel" class="collapsible-panel p-4 border-t border-gray-200">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div>
+                        <label for="topic-select" class="block mb-2 text-sm font-medium text-gray-700">Tema:</label>
+                        <select id="topic-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"></select>
+                    </div>
+                    <div class="relative">
+                        <label for="epigrafe-dropdown-btn" class="block mb-2 text-sm font-medium text-gray-700">Epígrafes:</label>
+                        <button id="epigrafe-dropdown-btn" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 text-left flex justify-between items-center">
+                            <span>Selecciona epígrafes...</span>
+                            <i class="fas fa-chevron-down transition-transform"></i>
+                        </button>
+                        <div id="epigrafe-dropdown-panel" class="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg hidden max-h-60 overflow-y-auto">
+                            <!-- Los epígrafes con checkboxes se generarán aquí -->
+                        </div>
+                    </div>
+                     <div>
+                        <label for="paragraph-select" class="block mb-2 text-sm font-medium text-gray-700">Párrafo de inicio:</label>
+                        <select id="paragraph-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" disabled></select>
+                    </div>
                 </div>
-            </div>
-             <div>
-                <label for="paragraph-select" class="block mb-2 text-sm font-medium text-gray-700">Párrafo de inicio:</label>
-                <select id="paragraph-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" disabled></select>
             </div>
         </div>
         
@@ -160,29 +195,46 @@
             <button id="forward-btn" title="Siguiente Párrafo" class="text-gray-600 hover:text-blue-600 transition-colors p-2 text-2xl" disabled><i class="fas fa-forward-step"></i></button>
         </div>
 
-        <div class="flex justify-center items-center gap-6 flex-wrap mb-6">
-            <div class="flex items-center gap-2">
-                <label for="repeat-select" class="text-sm font-medium text-gray-700">Repetir:</label>
-                <select id="repeat-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5">
-                    <option value="1">1 vez</option>
-                    <option value="2">2 veces</option>
-                    <option value="3">3 veces</option>
-                    <option value="4">4 veces</option>
-                    <option value="5">5 veces</option>
-                </select>
-            </div>
-            <button id="loop-btn" title="Repetir en bucle" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center transition-colors">
-                <i class="fas fa-sync-alt"></i>
+        <!-- Sección de Opciones Plegable -->
+        <div class="border rounded-lg mb-6 bg-white shadow-sm">
+            <button id="options-toggle-btn" class="collapsible-button w-full flex justify-between items-center p-3 text-left font-semibold text-gray-700 hover:bg-gray-50 rounded-t-lg">
+                <span>Opciones de Reproducción</span>
+                <i class="fas fa-chevron-up"></i>
             </button>
-             <div class="flex items-center gap-2">
-                <label class="text-sm font-medium text-gray-700">Velocidad:</label>
-                <button id="speed-down-btn" title="Disminuir Velocidad" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center" disabled><i class="fas fa-minus"></i></button>
-                <span id="current-speed-display" class="text-gray-900 text-sm font-bold min-w-[50px] text-center">1.00x</span>
-                <button id="speed-up-btn" title="Aumentar Velocidad" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center" disabled><i class="fas fa-plus"></i></button>
+            <div id="options-panel" class="collapsible-panel p-4 border-t border-gray-200">
+                <div class="flex justify-center items-center gap-6 flex-wrap">
+                    <div class="flex items-center gap-2">
+                        <label for="repeat-select" class="text-sm font-medium text-gray-700">Repetir:</label>
+                        <select id="repeat-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5">
+                            <option value="1">1 vez</option>
+                            <option value="2">2 veces</option>
+                            <option value="3">3 veces</option>
+                            <option value="4">4 veces</option>
+                            <option value="5">5 veces</option>
+                        </select>
+                    </div>
+                    <button id="loop-btn" title="Repetir en bucle" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center transition-colors">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                     <div class="flex items-center gap-2">
+                        <label class="text-sm font-medium text-gray-700">Velocidad:</label>
+                        <button id="speed-down-btn" title="Disminuir Velocidad" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center" disabled><i class="fas fa-minus"></i></button>
+                        <span id="current-speed-display" class="text-gray-900 text-sm font-bold min-w-[50px] text-center">1.00x</span>
+                        <button id="speed-up-btn" title="Aumentar Velocidad" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center" disabled><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label for="font-size-select" class="text-sm font-medium text-gray-700">Letra:</label>
+                        <select id="font-size-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5">
+                            <option value="sm">Pequeña</option>
+                            <option value="md" selected>Mediana</option>
+                            <option value="lg">Grande</option>
+                        </select>
+                    </div>
+                     <button id="toggle-text-display-size" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center" title="Vista Pantalla Completa">
+                        <i class="fas fa-expand-alt"></i>
+                    </button>
+                </div>
             </div>
-             <button id="toggle-text-display-size" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center" title="Expandir Texto">
-                <i class="fas fa-expand-alt"></i>
-            </button>
         </div>
         
         <div id="reader-status-container" class="flex items-center justify-center mb-4 min-h-[20px]">
@@ -191,7 +243,10 @@
         </div>
 
         <div id="text-reader-display-wrapper">
-            <div id="text-reader-display" class="text-lg md:text-xl leading-relaxed"></div>
+             <button id="fullscreen-close-btn" title="Cerrar vista completa" class="hidden fixed top-4 right-4 bg-red-500 hover:bg-red-600 text-white font-bold w-10 h-10 rounded-full shadow-lg z-50 flex items-center justify-center text-lg">
+                <i class="fas fa-times"></i>
+            </button>
+            <div id="text-reader-display" class="leading-relaxed"></div>
         </div>
     </div>
     
@@ -222,7 +277,8 @@
             const backToSelectionBtn = document.getElementById('back-to-selection-btn');
             const playerTitle = document.getElementById('player-title');
             const topicSelect = document.getElementById('topic-select');
-            const epigrafeList = document.getElementById('epigrafe-list');
+            const epigrafeDropdownBtn = document.getElementById('epigrafe-dropdown-btn');
+            const epigrafeDropdownPanel = document.getElementById('epigrafe-dropdown-panel');
             const paragraphSelect = document.getElementById('paragraph-select');
             const playPauseBtn = document.getElementById('play-pause-btn');
             const playPauseIcon = document.getElementById('play-pause-icon');
@@ -241,6 +297,12 @@
             const currentSpeedDisplay = document.getElementById('current-speed-display');
             const toggleTextDisplaySizeBtn = document.getElementById('toggle-text-display-size');
             const loopBtn = document.getElementById('loop-btn');
+            const selectionToggleBtn = document.getElementById('selection-toggle-btn');
+            const selectionPanel = document.getElementById('selection-panel');
+            const optionsToggleBtn = document.getElementById('options-toggle-btn');
+            const optionsPanel = document.getElementById('options-panel');
+            const fontSizeSelect = document.getElementById('font-size-select');
+            const fullscreenCloseBtn = document.getElementById('fullscreen-close-btn');
 
             // --- VARIABLES DE ESTADO DEL REPRODUCTOR ---
             let temarioDoc = null;
@@ -272,6 +334,7 @@
                 }
                 populateVoiceList();
                 setInterval(speechReactivation, 3000); 
+                applyFontSize(); // Aplicar tamaño de fuente inicial
             }
             
             function createSelectionCards() {
@@ -294,7 +357,25 @@
                 bloqueContainer.addEventListener('click', handleBloqueSelection);
                 backToSelectionBtn.addEventListener('click', handleBackToSelection);
                 topicSelect.addEventListener('change', updateEpigrafeList);
-                epigrafeList.addEventListener('change', () => prepareAndDisplayText(true));
+                
+                // Eventos del desplegable de epígrafes
+                epigrafeDropdownBtn.addEventListener('click', () => {
+                    epigrafeDropdownPanel.classList.toggle('hidden');
+                    epigrafeDropdownBtn.classList.toggle('open');
+                });
+                document.addEventListener('click', (event) => {
+                    const dropdownContainer = epigrafeDropdownBtn.parentElement;
+                    if (!dropdownContainer.contains(event.target)) {
+                        epigrafeDropdownPanel.classList.add('hidden');
+                        epigrafeDropdownBtn.classList.remove('open');
+                    }
+                });
+                epigrafeDropdownPanel.addEventListener('change', () => prepareAndDisplayText(true));
+
+                // Eventos de secciones plegables
+                selectionToggleBtn.addEventListener('click', () => togglePanel(selectionToggleBtn, selectionPanel));
+                optionsToggleBtn.addEventListener('click', () => togglePanel(optionsToggleBtn, optionsPanel));
+
                 paragraphSelect.addEventListener('change', () => {
                     currentParagraphIndex = parseInt(paragraphSelect.value, 10);
                     if (isSpeaking) {
@@ -309,11 +390,21 @@
                 forwardBtn.addEventListener('click', () => seek(1));
                 speedUpBtn.addEventListener('click', increaseSpeed);
                 speedDownBtn.addEventListener('click', decreaseSpeed);
-                toggleTextDisplaySizeBtn.addEventListener('click', toggleTextDisplaySize);
                 loopBtn.addEventListener('click', toggleLoop);
+                
+                // Nuevos listeners
+                fontSizeSelect.addEventListener('change', applyFontSize);
+                toggleTextDisplaySizeBtn.addEventListener('click', openFullscreen);
+                fullscreenCloseBtn.addEventListener('click', closeFullscreen);
+
                 window.onbeforeunload = () => {
                     speechSynthesis.cancel();
                 };
+            }
+
+            function togglePanel(button, panel) {
+                button.classList.toggle('closed');
+                panel.classList.toggle('hidden');
             }
 
             function handleBloqueSelection(event) {
@@ -398,7 +489,7 @@
                 stopReadingInternal(true);
                 const topicId = topicSelect.value;
                 
-                epigrafeList.innerHTML = '';
+                epigrafeDropdownPanel.innerHTML = '';
                 if (!temarioDoc || !topicId) return;
 
                 const topicElement = temarioDoc.querySelector(`#${topicId}`);
@@ -408,40 +499,38 @@
 
                 // Añadir opción "Seleccionar Todo"
                 const selectAllLabel = document.createElement('label');
-                selectAllLabel.className = 'epigrafe-item block font-semibold border-b border-gray-300 mb-1';
+                selectAllLabel.className = 'epigrafe-item block font-semibold border-b border-gray-300 mb-1 p-2';
                 selectAllLabel.innerHTML = `
                     <input type="checkbox" id="select-all-epigrafes" class="mr-2 rounded text-blue-600 focus:ring-blue-500">
                     <span>Tema Completo / Seleccionar Todo</span>
                 `;
-                epigrafeList.appendChild(selectAllLabel);
+                epigrafeDropdownPanel.appendChild(selectAllLabel);
 
                 epigrafes.forEach((h, index) => {
                     const label = document.createElement('label');
-                    label.className = 'epigrafe-item block';
+                    label.className = 'epigrafe-item block p-2';
                     label.dataset.index = index;
                     label.innerHTML = `
                         <input type="checkbox" class="epigrafe-checkbox mr-2 rounded text-blue-600 focus:ring-blue-500">
                         <span>${h.textContent.trim()}</span>
                     `;
-                    epigrafeList.appendChild(label);
+                    epigrafeDropdownPanel.appendChild(label);
                 });
 
                 // Lógica para "Seleccionar Todo"
                 const selectAllCheckbox = document.getElementById('select-all-epigrafes');
-                const allEpigrafeCheckboxes = epigrafeList.querySelectorAll('.epigrafe-checkbox');
+                const allEpigrafeCheckboxes = epigrafeDropdownPanel.querySelectorAll('.epigrafe-checkbox');
 
                 selectAllCheckbox.addEventListener('change', (e) => {
                     allEpigrafeCheckboxes.forEach(cb => cb.checked = e.target.checked);
-                    // Disparamos el evento change en la lista para que se actualice el texto
-                    epigrafeList.dispatchEvent(new Event('change', { bubbles: true }));
+                    epigrafeDropdownPanel.dispatchEvent(new Event('change', { bubbles: true }));
                 });
 
-                epigrafeList.addEventListener('change', () => {
+                epigrafeDropdownPanel.addEventListener('change', () => {
                     const allChecked = [...allEpigrafeCheckboxes].every(cb => cb.checked);
                     selectAllCheckbox.checked = allChecked;
                     
-                    // Actualizar estilos visuales
-                    epigrafeList.querySelectorAll('.epigrafe-item').forEach(item => {
+                    epigrafeDropdownPanel.querySelectorAll('.epigrafe-item').forEach(item => {
                         const checkbox = item.querySelector('input[type="checkbox"]');
                         if (checkbox && checkbox.checked) {
                             item.classList.add('selected');
@@ -449,9 +538,29 @@
                             item.classList.remove('selected');
                         }
                     });
+                    updateEpigrafeButtonText();
                 });
 
                 prepareAndDisplayText();
+                updateEpigrafeButtonText();
+            }
+
+            function updateEpigrafeButtonText() {
+                const btnTextSpan = epigrafeDropdownBtn.querySelector('span');
+                const selectAllCheckbox = document.getElementById('select-all-epigrafes');
+                if (selectAllCheckbox && selectAllCheckbox.checked) {
+                    btnTextSpan.textContent = 'Tema Completo';
+                    return;
+                }
+
+                const selectedCheckboxes = epigrafeDropdownPanel.querySelectorAll('.epigrafe-checkbox:checked');
+                if (selectedCheckboxes.length === 0) {
+                    btnTextSpan.textContent = 'Selecciona epígrafes...';
+                } else if (selectedCheckboxes.length === 1) {
+                    btnTextSpan.textContent = '1 epígrafe seleccionado';
+                } else {
+                    btnTextSpan.textContent = `${selectedCheckboxes.length} epígrafes seleccionados`;
+                }
             }
 
             function prepareAndDisplayText(selectionChanged = false) {
@@ -542,7 +651,7 @@
                     return Array.from(topicElement.querySelectorAll('h1,h2,h3,h4,h5,h6,p,ul,ol'));
                 }
 
-                const selectedCheckboxes = epigrafeList.querySelectorAll('.epigrafe-checkbox:checked');
+                const selectedCheckboxes = epigrafeDropdownPanel.querySelectorAll('.epigrafe-checkbox:checked');
                 if (selectedCheckboxes.length === 0) return null;
 
                 const allHeadings = topicElement.querySelectorAll('h2, h3, h4');
@@ -768,7 +877,6 @@
             function updateSpeedDisplay() {
                 currentSpeedDisplay.textContent = `${currentSpeechRate.toFixed(2)}x`;
                 if (utterance && isSpeaking) {
-                    // To change speed mid-speech, we have to stop and restart
                     const wasPaused = isPaused;
                     stopReadingInternal();
                     setTimeout(() => {
@@ -780,16 +888,39 @@
                 }
             }
             
-            function toggleTextDisplaySize() {
-                textReaderDisplayWrapper.classList.toggle('expanded');
-                const icon = toggleTextDisplaySizeBtn.querySelector('i');
-                icon.className = textReaderDisplayWrapper.classList.contains('expanded') ? 'fas fa-compress-alt' : 'fas fa-expand-alt';
-                toggleTextDisplaySizeBtn.title = textReaderDisplayWrapper.classList.contains('expanded') ? 'Contraer Texto' : 'Expandir Texto';
+            function applyFontSize() {
+                const size = fontSizeSelect.value;
+                const display = textReaderDisplay;
+                display.classList.remove('text-base', 'text-lg', 'text-xl');
+                switch(size) {
+                    case 'sm':
+                        display.classList.add('text-base');
+                        break;
+                    case 'lg':
+                        display.classList.add('text-xl');
+                        break;
+                    case 'md':
+                    default:
+                        display.classList.add('text-lg');
+                        break;
+                }
+            }
+
+            function openFullscreen() {
+                textReaderDisplayWrapper.classList.add('fullscreen-view');
+                fullscreenCloseBtn.classList.remove('hidden');
+                document.body.classList.add('overflow-hidden');
+            }
+
+            function closeFullscreen() {
+                textReaderDisplayWrapper.classList.remove('fullscreen-view');
+                fullscreenCloseBtn.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
             }
 
             function resetPlayerUI() {
                 topicSelect.innerHTML = '';
-                epigrafeList.innerHTML = '';
+                epigrafeDropdownPanel.innerHTML = '';
                 paragraphSelect.innerHTML = '';
                 textReaderDisplay.innerHTML = '';
                 
