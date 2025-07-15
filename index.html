@@ -122,7 +122,7 @@
         }
         .collapsible-panel {
             transition: max-height 0.3s ease-in-out, padding 0.3s ease-in-out;
-            overflow: hidden;
+            /* Se elimina overflow: hidden para permitir que el desplegable se vea */
         }
     </style>
 </head>
@@ -225,6 +225,7 @@
                     <div class="flex items-center gap-2">
                         <label for="font-size-select" class="text-sm font-medium text-gray-700">Letra:</label>
                         <select id="font-size-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5">
+                            <option value="xs">Muy pequeña</option>
                             <option value="sm">Pequeña</option>
                             <option value="md" selected>Mediana</option>
                             <option value="lg">Grande</option>
@@ -598,6 +599,7 @@
                 populateParagraphSelect();
                 updateProgressBar();
                 updateUIState('idle');
+                applyFontSize(); // Aplicar tamaño de fuente al nuevo contenido
             }
 
             function handlePlayPause() {
@@ -703,8 +705,11 @@
                 const newElement = document.createElement(tagName === 'LI' ? 'p' : tagName.toLowerCase());
                 newElement.className = 'p-2 transition-colors duration-200';
                 
-                if (tagName.startsWith('H')) newElement.className += ' font-bold text-xl text-gray-800 border-b-2 mt-4';
-                else if (tagName === 'LI') newElement.className += ' flex items-start';
+                if (tagName.startsWith('H')) {
+                    newElement.className += ' font-bold text-gray-800 border-b-2 mt-4';
+                } else if (tagName === 'LI') {
+                    newElement.className += ' flex items-start';
+                }
                 
                 const textContainer = document.createElement('span');
                 
@@ -891,19 +896,40 @@
             function applyFontSize() {
                 const size = fontSizeSelect.value;
                 const display = textReaderDisplay;
-                display.classList.remove('text-base', 'text-lg', 'text-xl');
+                
+                const paragraphsAndLists = display.querySelectorAll('p, li');
+                const headings = display.querySelectorAll('h1, h2, h3, h4, h5, h6');
+                const allTextElements = [ ...paragraphsAndLists, ...headings ];
+
+                // Remove all possible font size classes
+                allTextElements.forEach(el => {
+                    el.classList.remove('text-sm', 'text-base', 'text-lg', 'text-xl', 'text-2xl', 'text-3xl');
+                });
+
+                let pSize, hSize;
+
                 switch(size) {
+                    case 'xs':
+                        pSize = 'text-sm';
+                        hSize = 'text-lg';
+                        break;
                     case 'sm':
-                        display.classList.add('text-base');
+                        pSize = 'text-base';
+                        hSize = 'text-xl';
                         break;
                     case 'lg':
-                        display.classList.add('text-xl');
+                        pSize = 'text-xl';
+                        hSize = 'text-3xl';
                         break;
                     case 'md':
                     default:
-                        display.classList.add('text-lg');
+                        pSize = 'text-lg';
+                        hSize = 'text-2xl';
                         break;
                 }
+
+                paragraphsAndLists.forEach(el => el.classList.add(pSize));
+                headings.forEach(el => el.classList.add(hSize));
             }
 
             function openFullscreen() {
