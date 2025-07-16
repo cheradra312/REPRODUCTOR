@@ -340,12 +340,12 @@
             let isSpeaking = false;
             let isPaused = false;
             let stopRequested = false;
-            let seekInProgress = false;
+            let seekInProgress = false; // Usado para interrupciones controladas (seek, cambio de velocidad)
             let isLooping = false;
             let currentParagraphIndex = 0;
             let currentRepetition = 0;
             let currentSpeechRate = 1.0;
-            let screenWakeLock = null; // <-- NUEVA VARIABLE para el Wake Lock
+            let screenWakeLock = null; 
             const minSpeechRate = 0.5;
             const maxSpeechRate = 2.0;
             const speechRateIncrement = 0.25;
@@ -360,7 +360,7 @@
                 }
                 populateVoiceList();
                 setInterval(speechReactivation, 3000); 
-                applyFontSize(); // Aplicar tamaño de fuente inicial
+                applyFontSize(); 
             }
             
             function createSelectionCards() {
@@ -382,35 +382,52 @@
             function setupEventListeners() {
                 bloqueContainer.addEventListener('click', handleBloqueSelection);
                 backToSelectionBtn.addEventListener('click', handleBackToSelection);
-                topicSelect.addEventListener('change', updateEpigrafeList);
+                topicSelect.addEventListener('change', () => prepareAndDisplayText(true));
                 
-                // Eventos del desplegable de epígrafes
                 epigrafeDropdownBtn.addEventListener('click', () => {
                     epigrafeDropdownPanel.classList.toggle('hidden');
                     epigrafeDropdownBtn.classList.toggle('open');
                 });
+
                 document.addEventListener('click', (event) => {
                     const dropdownContainer = epigrafeDropdownBtn.parentElement;
                     if (!dropdownContainer.contains(event.target)) {
-                        epigrafeDropdownPanel.classList.add('hidden');
-                        epigrafeDropdownBtn.classList.remove('open');
+                        if (!epigrafeDropdownPanel.classList.contains('hidden')) {
+                            epigrafeDropdownPanel.classList.add('hidden');
+                            epigrafeDropdownBtn.classList.remove('open');
+                            if (paragraphs.length > 0 && !isSpeaking) {
+                                handlePlayPause();
+                            }
+                        }
                     }
                 });
+                
                 epigrafeDropdownPanel.addEventListener('change', () => prepareAndDisplayText(true));
 
-                // Eventos de secciones plegables
                 selectionToggleBtn.addEventListener('click', () => togglePanel(selectionToggleBtn, selectionPanel));
                 optionsToggleBtn.addEventListener('click', () => togglePanel(optionsToggleBtn, optionsPanel));
 
                 paragraphSelect.addEventListener('change', () => {
+                    const wasPaused = isPaused;
                     currentParagraphIndex = parseInt(paragraphSelect.value, 10);
+                    
                     if (isSpeaking) {
-                        stopReadingInternal();
-                        setTimeout(playCurrentParagraph, 150);
+                        seekInProgress = true;
+                        speechSynthesis.cancel();
+                        setTimeout(() => {
+                            seekInProgress = false;
+                            playCurrentParagraph();
+                            if (wasPaused) {
+                                setTimeout(() => {
+                                    if (speechSynthesis.speaking) speechSynthesis.pause();
+                                }, 50);
+                            }
+                        }, 100);
                     } else {
-                        updateProgressBar();
+                        handlePlayPause();
                     }
                 });
+
                 playPauseBtn.addEventListener('click', handlePlayPause);
                 rewindBtn.addEventListener('click', () => seek(-1));
                 forwardBtn.addEventListener('click', () => seek(1));
@@ -418,7 +435,6 @@
                 speedDownBtn.addEventListener('click', decreaseSpeed);
                 loopBtn.addEventListener('click', toggleLoop);
                 
-                // Nuevos listeners
                 fontSizeSelect.addEventListener('change', applyFontSize);
                 toggleTextDisplaySizeBtn.addEventListener('click', toggleFullscreen);
                 fullscreenCloseBtn.addEventListener('click', toggleFullscreen);
@@ -493,7 +509,6 @@
                 }
             }
             
-            // --- NUEVAS FUNCIONES PARA WAKE LOCK ---
             const requestWakeLock = async () => {
                 if ('wakeLock' in navigator) {
                     try {
@@ -512,16 +527,13 @@
             };
 
             const releaseWakeLock = () => {
-                if (screenWakeLock !== null) {
-                    screenWakeLock.release()
-                        .then(() => {
-                            screenWakeLock = null;
-                            log('Wake Lock liberado.');
-                        });
+                if (screenWakeLock) {
+                    screenWakeLock.release().then(() => {
+                        screenWakeLock = null;
+                        log('Wake Lock liberado.');
+                    });
                 }
             };
-
-            // --- LÓGICA DEL REPRODUCTOR ---
 
             function populateVoiceList() {
                 if (voicesReady) return;
@@ -535,69 +547,13 @@
             function speechReactivation() {
                 if(isSpeaking && !speechSynthesis.speaking && !isPaused) {
                     log('El motor de voz parece haberse detenido, intentando reiniciar...');
-                    stopReadingInternal();
+                    speechSynthesis.cancel();
                     setTimeout(() => playCurrentParagraph(), 100);
                 }
             }
             
             function updateEpigrafeList() {
-                stopReadingInternal(true);
-                const topicId = topicSelect.value;
-                
-                epigrafeDropdownPanel.innerHTML = '';
-                if (!temarioDoc || !topicId) return;
-
-                const topicElement = temarioDoc.querySelector(`#${topicId}`);
-                if (!topicElement) return;
-
-                const epigrafes = topicElement.querySelectorAll('h2, h3, h4');
-
-                // Añadir opción "Seleccionar Todo"
-                const selectAllLabel = document.createElement('label');
-                selectAllLabel.className = 'epigrafe-item block font-semibold border-b border-gray-300 mb-1 p-2';
-                selectAllLabel.innerHTML = `
-                    <input type="checkbox" id="select-all-epigrafes" class="mr-2 rounded text-blue-600 focus:ring-blue-500">
-                    <span>Tema Completo / Seleccionar Todo</span>
-                `;
-                epigrafeDropdownPanel.appendChild(selectAllLabel);
-
-                epigrafes.forEach((h, index) => {
-                    const label = document.createElement('label');
-                    label.className = 'epigrafe-item block p-2';
-                    label.dataset.index = index;
-                    label.innerHTML = `
-                        <input type="checkbox" class="epigrafe-checkbox mr-2 rounded text-blue-600 focus:ring-blue-500">
-                        <span>${h.textContent.trim()}</span>
-                    `;
-                    epigrafeDropdownPanel.appendChild(label);
-                });
-
-                // Lógica para "Seleccionar Todo"
-                const selectAllCheckbox = document.getElementById('select-all-epigrafes');
-                const allEpigrafeCheckboxes = epigrafeDropdownPanel.querySelectorAll('.epigrafe-checkbox');
-
-                selectAllCheckbox.addEventListener('change', (e) => {
-                    allEpigrafeCheckboxes.forEach(cb => cb.checked = e.target.checked);
-                    epigrafeDropdownPanel.dispatchEvent(new Event('change', { bubbles: true }));
-                });
-
-                epigrafeDropdownPanel.addEventListener('change', () => {
-                    const allChecked = [...allEpigrafeCheckboxes].every(cb => cb.checked);
-                    selectAllCheckbox.checked = allChecked;
-                    
-                    epigrafeDropdownPanel.querySelectorAll('.epigrafe-item').forEach(item => {
-                        const checkbox = item.querySelector('input[type="checkbox"]');
-                        if (checkbox && checkbox.checked) {
-                            item.classList.add('selected');
-                        } else {
-                            item.classList.remove('selected');
-                        }
-                    });
-                    updateEpigrafeButtonText();
-                });
-
-                prepareAndDisplayText();
-                updateEpigrafeButtonText();
+                prepareAndDisplayText(true);
             }
 
             function updateEpigrafeButtonText() {
@@ -619,7 +575,45 @@
             }
 
             function prepareAndDisplayText(selectionChanged = false) {
-                if (selectionChanged) stopReadingInternal(true);
+                const wasPlaying = isSpeaking && !isPaused;
+                if (selectionChanged) {
+                    stopReadingInternal(true);
+                }
+                
+                const topicId = topicSelect.value;
+                epigrafeDropdownPanel.innerHTML = '';
+                if (!temarioDoc || !topicId) return;
+                const topicElement = temarioDoc.querySelector(`#${topicId}`);
+                if (!topicElement) return;
+
+                const epigrafes = topicElement.querySelectorAll('h2, h3, h4');
+                const selectAllLabel = document.createElement('label');
+                selectAllLabel.className = 'epigrafe-item block font-semibold border-b border-gray-300 mb-1 p-2';
+                selectAllLabel.innerHTML = `<input type="checkbox" id="select-all-epigrafes" class="mr-2 rounded text-blue-600 focus:ring-blue-500"> <span>Tema Completo / Seleccionar Todo</span>`;
+                epigrafeDropdownPanel.appendChild(selectAllLabel);
+
+                epigrafes.forEach((h, index) => {
+                    const label = document.createElement('label');
+                    label.className = 'epigrafe-item block p-2';
+                    label.dataset.index = index;
+                    label.innerHTML = `<input type="checkbox" class="epigrafe-checkbox mr-2 rounded text-blue-600 focus:ring-blue-500"> <span>${h.textContent.trim()}</span>`;
+                    epigrafeDropdownPanel.appendChild(label);
+                });
+
+                const selectAllCheckbox = document.getElementById('select-all-epigrafes');
+                const allEpigrafeCheckboxes = epigrafeDropdownPanel.querySelectorAll('.epigrafe-checkbox');
+                selectAllCheckbox.addEventListener('change', (e) => {
+                    allEpigrafeCheckboxes.forEach(cb => cb.checked = e.target.checked);
+                    epigrafeDropdownPanel.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+                epigrafeDropdownPanel.addEventListener('change', () => {
+                    selectAllCheckbox.checked = [...allEpigrafeCheckboxes].every(cb => cb.checked);
+                    epigrafeDropdownPanel.querySelectorAll('.epigrafe-item').forEach(item => {
+                        const checkbox = item.querySelector('input[type="checkbox"]');
+                        item.classList.toggle('selected', checkbox && checkbox.checked);
+                    });
+                    updateEpigrafeButtonText();
+                });
                 
                 const elements = getElementsForSelection();
                 textReaderDisplay.innerHTML = '';
@@ -653,49 +647,41 @@
                 populateParagraphSelect();
                 updateProgressBar();
                 updateUIState('idle');
-                applyFontSize(); // Aplicar tamaño de fuente al nuevo contenido
+                applyFontSize();
+                updateEpigrafeButtonText();
+
+                if (wasPlaying && paragraphs.length > 0) {
+                    setTimeout(() => handlePlayPause(), 100);
+                }
             }
 
             function handlePlayPause() {
-                log('handlePlayPause called.', { isPaused, isSpeaking });
-                
                 if (!voicesReady){
-                    log('Las voces no están listas.');
                     readerStatus.textContent = "Las voces del navegador aún no están listas.";
                     populateVoiceList();
                     return;
                 }
 
                 if (isPaused) {
-                    log('Reanudando la reproducción.');
-                    requestWakeLock(); // <-- Solicitar Wake Lock al reanudar
                     speechSynthesis.resume();
                 } else if (isSpeaking) {
-                    log('Pausando la reproducción.');
-                    releaseWakeLock(); // <-- Liberar Wake Lock al pausar
                     speechSynthesis.pause();
                 } else {
-                    log('Iniciando nueva reproducción.');
-                    requestWakeLock(); // <-- Solicitar Wake Lock al iniciar
                     startPlaybackQueue();
                 }
             }
             
             function stopReadingInternal(resetIndex = false) {
                 log('stopReadingInternal llamado. reseteando índice:', resetIndex);
-                releaseWakeLock(); // <-- Liberar Wake Lock al detener
                 stopRequested = true;
-                if(speechSynthesis.speaking || speechSynthesis.pending) {
-                    speechSynthesis.cancel();
-                }
-                if (lastHighlightedParagraph) {
-                    lastHighlightedParagraph.classList.remove('paragraph-highlight');
-                    lastHighlightedParagraph = null;
-                }
+                speechSynthesis.cancel();
+                
                 if(resetIndex){
                    currentParagraphIndex = 0;
                    currentRepetition = 0;
-                   resetState();
+                }
+                if (!isSpeaking) {
+                    resetState();
                 }
             }
 
@@ -720,9 +706,7 @@
                 selectedCheckboxes.forEach(checkbox => {
                     const label = checkbox.closest('.epigrafe-item');
                     const index = parseInt(label.dataset.index, 10);
-                    
                     if (isNaN(index)) return;
-
                     const startElement = allHeadings[index];
                     if (!startElement) return;
                     
@@ -835,13 +819,28 @@
                     isSpeaking = true; isPaused = false; stopRequested = false;
                     highlightCurrentParagraph();
                     updateUIState('speaking'); 
+                    requestWakeLock();
                 };
-                utterance.onpause = () => { isPaused = true; updateUIState('paused'); };
-                utterance.onresume = () => { isPaused = false; updateUIState('speaking'); };
+                utterance.onpause = () => { 
+                    isPaused = true; 
+                    releaseWakeLock();
+                    updateUIState('paused'); 
+                };
+                utterance.onresume = () => { 
+                    isPaused = false; 
+                    requestWakeLock();
+                    updateUIState('speaking'); 
+                };
                 utterance.onboundary = handleWordBoundary;
 
                 utterance.onend = () => {
-                    if (stopRequested || seekInProgress) return;
+                    releaseWakeLock();
+                    if (seekInProgress) return;
+                    if (stopRequested) {
+                        resetState();
+                        return;
+                    }
+                    
                     currentRepetition++;
                     if (lastHighlightedSpan) lastHighlightedSpan.classList.remove('highlight');
                     
@@ -899,18 +898,23 @@
             
             function seek(direction) {
                 if (!isSpeaking && !isPaused) return;
-                
                 const newIndex = currentParagraphIndex + direction;
 
                 if (newIndex >= 0 && newIndex < paragraphs.length) {
+                    const wasPaused = isPaused;
                     seekInProgress = true;
-                    speechSynthesis.cancel(); 
+                    speechSynthesis.cancel();
                     currentParagraphIndex = newIndex;
                     currentRepetition = 0;
                     setTimeout(() => {
-                        playCurrentParagraph(); 
                         seekInProgress = false;
-                    }, 150);
+                        playCurrentParagraph();
+                        if (wasPaused) {
+                            setTimeout(() => {
+                                if (speechSynthesis.speaking) speechSynthesis.pause();
+                            }, 50);
+                        }
+                    }, 100);
                 }
             }
 
@@ -922,31 +926,36 @@
                 loopBtn.classList.toggle('text-gray-700', !isLooping);
             }
 
+            function updateSpeed() {
+                if (isSpeaking) {
+                    const wasPaused = isPaused;
+                    seekInProgress = true;
+                    speechSynthesis.cancel();
+                    setTimeout(() => {
+                        seekInProgress = false;
+                        playCurrentParagraph();
+                        if (wasPaused) {
+                            setTimeout(() => {
+                                if (speechSynthesis.speaking) speechSynthesis.pause();
+                            }, 50);
+                        }
+                    }, 100);
+                }
+            }
+
             function increaseSpeed() {
                 if (currentSpeechRate < maxSpeechRate) {
                     currentSpeechRate = Math.min(maxSpeechRate, parseFloat((currentSpeechRate + speechRateIncrement).toFixed(2)));
-                    updateSpeedDisplay();
+                    currentSpeedDisplay.textContent = `${currentSpeechRate.toFixed(2)}x`;
+                    updateSpeed();
                 }
             }
             
             function decreaseSpeed() {
                 if (currentSpeechRate > minSpeechRate) {
                     currentSpeechRate = Math.max(minSpeechRate, parseFloat((currentSpeechRate - speechRateIncrement).toFixed(2)));
-                    updateSpeedDisplay();
-                }
-            }
-            
-            function updateSpeedDisplay() {
-                currentSpeedDisplay.textContent = `${currentSpeechRate.toFixed(2)}x`;
-                if (utterance && isSpeaking) {
-                    const wasPaused = isPaused;
-                    stopReadingInternal();
-                    setTimeout(() => {
-                        playCurrentParagraph();
-                        if (wasPaused) {
-                           setTimeout(() => speechSynthesis.pause(), 50);
-                        }
-                    }, 150);
+                    currentSpeedDisplay.textContent = `${currentSpeechRate.toFixed(2)}x`;
+                    updateSpeed();
                 }
             }
             
@@ -957,23 +966,17 @@
                 const paragraphsAndLists = display.querySelectorAll('p, li');
                 const headings = display.querySelectorAll('h1, h2, h3, h4, h5, h6');
 
-                // Reset classes
                 [...paragraphsAndLists, ...headings].forEach(el => {
                     el.className = el.className.replace(/text-(xs|sm|base|lg|xl|2xl|3xl|4xl)/g, '');
                 });
 
                 let pSize, hSize;
-
                 switch(size) {
-                    case 'xs':
-                        pSize = 'text-sm'; hSize = 'text-lg'; break;
-                    case 'sm':
-                        pSize = 'text-base'; hSize = 'text-xl'; break;
-                    case 'lg':
-                        pSize = 'text-xl'; hSize = 'text-3xl'; break;
+                    case 'xs': pSize = 'text-sm'; hSize = 'text-lg'; break;
+                    case 'sm': pSize = 'text-base'; hSize = 'text-xl'; break;
+                    case 'lg': pSize = 'text-xl'; hSize = 'text-3xl'; break;
                     case 'md':
-                    default:
-                        pSize = 'text-lg'; hSize = 'text-2xl'; break;
+                    default: pSize = 'text-lg'; hSize = 'text-2xl'; break;
                 }
 
                 paragraphsAndLists.forEach(el => el.classList.add(pSize));
@@ -982,7 +985,6 @@
 
             function toggleFullscreen() {
                 const isFullscreen = document.body.classList.toggle('fullscreen-mode');
-
                 mainControlsArea.classList.toggle('fullscreen', isFullscreen);
                 textReaderDisplayWrapper.classList.toggle('fullscreen', isFullscreen);
                 fullscreenCloseBtn.classList.toggle('fullscreen', isFullscreen);
@@ -1004,16 +1006,12 @@
             function resetPlayerUI() {
                 topicSelect.innerHTML = '';
                 epigrafeDropdownPanel.innerHTML = '';
-                paragraphSelect.innerHTML = '';
                 textReaderDisplay.innerHTML = '';
                 
-                paragraphSelect.disabled = true;
-
                 paragraphs = [];
                 temarioDoc = null;
-                currentParagraphIndex = 0;
-                currentRepetition = 0;
                 
+                resetParagraphs();
                 updateProgressBar();
                 resetState();
             }
@@ -1030,10 +1028,12 @@
                  isSpeaking = false;
                  isPaused = false;
                  stopRequested = false;
+                 seekInProgress = false;
                  if (lastHighlightedSpan) lastHighlightedSpan.classList.remove('highlight');
                  if (lastHighlightedParagraph) lastHighlightedParagraph.classList.remove('paragraph-highlight');
                  lastHighlightedSpan = null;
                  lastHighlightedParagraph = null;
+                 releaseWakeLock();
                  updateUIState('idle');
             }
 
@@ -1076,7 +1076,6 @@
                 progressText.textContent = `${Math.round(progress)}%`;
             }
 
-            // Iniciar la aplicación
             initializeApp();
         });
     </script>
