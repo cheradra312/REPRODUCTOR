@@ -257,8 +257,8 @@
                             </select>
                         </div>
                          <button id="toggle-text-display-size" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center" title="Vista Pantalla Completa">
-                            <i class="fas fa-expand-alt"></i>
-                        </button>
+                             <i class="fas fa-expand-alt"></i>
+                         </button>
                     </div>
                 </div>
             </div>
@@ -863,21 +863,33 @@
                 }
             }
             
+            // --- FUNCIÓN CORREGIDA ---
             function seek(direction) {
+                // Solo buscar si se está reproduciendo o en pausa.
                 if (!isSpeaking && !isPaused) return;
                 
-                seekInProgress = true;
                 const newIndex = currentParagraphIndex + direction;
+
+                // Comprobar si el nuevo índice es válido.
                 if (newIndex >= 0 && newIndex < paragraphs.length) {
-                    stopReadingInternal();
+                    // Queremos interrumpir la locución actual y empezar una nueva
+                    // sin activar la lógica de "parada total" que impediría el reinicio.
+                    
+                    seekInProgress = true; // Evita que el manejador 'onend' de la locución antigua se dispare incorrectamente.
+                    
+                    // Detiene la síntesis de voz actual. Es una operación asíncrona.
+                    speechSynthesis.cancel(); 
+                    
+                    // Actualiza el índice del párrafo y el contador de repeticiones.
                     currentParagraphIndex = newIndex;
                     currentRepetition = 0;
+                    
+                    // Programa la reproducción del nuevo párrafo tras un breve retardo.
+                    // Esto ayuda a prevenir condiciones de carrera con el comando de cancelación del sintetizador de voz.
                     setTimeout(() => {
-                        seekInProgress = false;
-                        playCurrentParagraph();
+                        playCurrentParagraph(); // Inicia la reproducción del nuevo párrafo.
+                        seekInProgress = false; // Restablece la bandera.
                     }, 150);
-                } else {
-                    seekInProgress = false;
                 }
             }
 
@@ -1049,3 +1061,5 @@
     </script>
 </body>
 </html>
+```
+
