@@ -16,6 +16,9 @@
             font-family: 'Inter', sans-serif;
             background-color: #f3f4f6;
         }
+        body.fullscreen-mode {
+            overflow: hidden;
+        }
         /* Ocultar elementos */
         .hidden {
             display: none;
@@ -53,10 +56,10 @@
             border-radius: 0.5rem;
             padding: 1.5rem;
             position: relative; 
-            transition: height 0.3s ease-in-out;
+            transition: all 0.3s ease-in-out;
         }
         /* Estilo para la vista de pantalla completa */
-        #text-reader-display-wrapper.fullscreen-view {
+        #text-reader-display-wrapper.fullscreen {
             position: fixed;
             top: 0;
             left: 0;
@@ -64,8 +67,8 @@
             height: 100vh;
             z-index: 50;
             border-radius: 0;
-            height: 100%;
             overflow-y: auto;
+            background: #f9fafb;
         }
         select:disabled, button:disabled {
             background-color: #e5e7eb;
@@ -122,7 +125,25 @@
         }
         .collapsible-panel {
             transition: max-height 0.3s ease-in-out, padding 0.3s ease-in-out;
-            /* Se elimina overflow: hidden para permitir que el desplegable se vea */
+        }
+        /* Estilos para controles en pantalla completa */
+        #main-controls-area.fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 60;
+            background: white;
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        #fullscreen-close-btn.fullscreen {
+            display: flex;
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 70;
         }
     </style>
 </head>
@@ -138,6 +159,9 @@
 
     <!-- Pantalla del Reproductor (inicialmente oculta) -->
     <div id="player-screen" class="w-full max-w-6xl bg-white rounded-xl shadow-2xl p-6 md:p-8 hidden">
+        <button id="fullscreen-close-btn" title="Cerrar vista completa" class="hidden bg-red-500 hover:bg-red-600 text-white font-bold w-10 h-10 rounded-full shadow-lg flex items-center justify-center text-lg">
+            <i class="fas fa-times"></i>
+        </button>
         <div class="flex justify-between items-center mb-4">
              <button id="back-to-selection-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors">
                  <i class="fas fa-arrow-left"></i>
@@ -187,53 +211,55 @@
             <span id="progress-text" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-xs text-white font-medium z-10">0%</span>
         </div>
 
-        <div class="flex items-center justify-center gap-4 mb-4">
-            <button id="rewind-btn" title="Párrafo anterior" class="text-gray-600 hover:text-blue-600 transition-colors p-2 text-2xl" disabled><i class="fas fa-backward-step"></i></button>
-            <button id="play-pause-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold w-16 h-16 rounded-full shadow-lg transition-transform transform hover:scale-110 flex items-center justify-center text-2xl" disabled>
-                <i id="play-pause-icon" class="fas fa-play"></i>
-            </button>
-            <button id="forward-btn" title="Siguiente Párrafo" class="text-gray-600 hover:text-blue-600 transition-colors p-2 text-2xl" disabled><i class="fas fa-forward-step"></i></button>
-        </div>
+        <div id="main-controls-area">
+            <div class="flex items-center justify-center gap-4 my-4">
+                <button id="rewind-btn" title="Párrafo anterior" class="text-gray-600 hover:text-blue-600 transition-colors p-2 text-2xl" disabled><i class="fas fa-backward-step"></i></button>
+                <button id="play-pause-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold w-16 h-16 rounded-full shadow-lg transition-transform transform hover:scale-110 flex items-center justify-center text-2xl" disabled>
+                    <i id="play-pause-icon" class="fas fa-play"></i>
+                </button>
+                <button id="forward-btn" title="Siguiente Párrafo" class="text-gray-600 hover:text-blue-600 transition-colors p-2 text-2xl" disabled><i class="fas fa-forward-step"></i></button>
+            </div>
 
-        <!-- Sección de Opciones Plegable -->
-        <div class="border rounded-lg mb-6 bg-white shadow-sm">
-            <button id="options-toggle-btn" class="collapsible-button w-full flex justify-between items-center p-3 text-left font-semibold text-gray-700 hover:bg-gray-50 rounded-t-lg">
-                <span>Opciones de Reproducción</span>
-                <i class="fas fa-chevron-up"></i>
-            </button>
-            <div id="options-panel" class="collapsible-panel p-4 border-t border-gray-200">
-                <div class="flex justify-center items-center gap-6 flex-wrap">
-                    <div class="flex items-center gap-2">
-                        <label for="repeat-select" class="text-sm font-medium text-gray-700">Repetir:</label>
-                        <select id="repeat-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5">
-                            <option value="1">1 vez</option>
-                            <option value="2">2 veces</option>
-                            <option value="3">3 veces</option>
-                            <option value="4">4 veces</option>
-                            <option value="5">5 veces</option>
-                        </select>
+            <!-- Sección de Opciones Plegable -->
+            <div class="border rounded-lg mb-4 bg-white shadow-sm">
+                <button id="options-toggle-btn" class="collapsible-button w-full flex justify-between items-center p-3 text-left font-semibold text-gray-700 hover:bg-gray-50 rounded-t-lg">
+                    <span>Opciones de Reproducción</span>
+                    <i class="fas fa-chevron-up"></i>
+                </button>
+                <div id="options-panel" class="collapsible-panel p-4 border-t border-gray-200">
+                    <div class="flex justify-center items-center gap-6 flex-wrap">
+                        <div class="flex items-center gap-2">
+                            <label for="repeat-select" class="text-sm font-medium text-gray-700">Repetir:</label>
+                            <select id="repeat-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5">
+                                <option value="1">1 vez</option>
+                                <option value="2">2 veces</option>
+                                <option value="3">3 veces</option>
+                                <option value="4">4 veces</option>
+                                <option value="5">5 veces</option>
+                            </select>
+                        </div>
+                        <button id="loop-btn" title="Repetir en bucle" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center transition-colors">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                         <div class="flex items-center gap-2">
+                            <label class="text-sm font-medium text-gray-700">Velocidad:</label>
+                            <button id="speed-down-btn" title="Disminuir Velocidad" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center" disabled><i class="fas fa-minus"></i></button>
+                            <span id="current-speed-display" class="text-gray-900 text-sm font-bold min-w-[50px] text-center">1.00x</span>
+                            <button id="speed-up-btn" title="Aumentar Velocidad" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center" disabled><i class="fas fa-plus"></i></button>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label for="font-size-select" class="text-sm font-medium text-gray-700">Letra:</label>
+                            <select id="font-size-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5">
+                                <option value="xs">Muy pequeña</option>
+                                <option value="sm">Pequeña</option>
+                                <option value="md" selected>Mediana</option>
+                                <option value="lg">Grande</option>
+                            </select>
+                        </div>
+                         <button id="toggle-text-display-size" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center" title="Vista Pantalla Completa">
+                            <i class="fas fa-expand-alt"></i>
+                        </button>
                     </div>
-                    <button id="loop-btn" title="Repetir en bucle" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center transition-colors">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                     <div class="flex items-center gap-2">
-                        <label class="text-sm font-medium text-gray-700">Velocidad:</label>
-                        <button id="speed-down-btn" title="Disminuir Velocidad" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center" disabled><i class="fas fa-minus"></i></button>
-                        <span id="current-speed-display" class="text-gray-900 text-sm font-bold min-w-[50px] text-center">1.00x</span>
-                        <button id="speed-up-btn" title="Aumentar Velocidad" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center" disabled><i class="fas fa-plus"></i></button>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <label for="font-size-select" class="text-sm font-medium text-gray-700">Letra:</label>
-                        <select id="font-size-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5">
-                            <option value="xs">Muy pequeña</option>
-                            <option value="sm">Pequeña</option>
-                            <option value="md" selected>Mediana</option>
-                            <option value="lg">Grande</option>
-                        </select>
-                    </div>
-                     <button id="toggle-text-display-size" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center" title="Vista Pantalla Completa">
-                        <i class="fas fa-expand-alt"></i>
-                    </button>
                 </div>
             </div>
         </div>
@@ -244,9 +270,6 @@
         </div>
 
         <div id="text-reader-display-wrapper">
-             <button id="fullscreen-close-btn" title="Cerrar vista completa" class="hidden fixed top-4 right-4 bg-red-500 hover:bg-red-600 text-white font-bold w-10 h-10 rounded-full shadow-lg z-50 flex items-center justify-center text-lg">
-                <i class="fas fa-times"></i>
-            </button>
             <div id="text-reader-display" class="leading-relaxed"></div>
         </div>
     </div>
@@ -304,6 +327,7 @@
             const optionsPanel = document.getElementById('options-panel');
             const fontSizeSelect = document.getElementById('font-size-select');
             const fullscreenCloseBtn = document.getElementById('fullscreen-close-btn');
+            const mainControlsArea = document.getElementById('main-controls-area');
 
             // --- VARIABLES DE ESTADO DEL REPRODUCTOR ---
             let temarioDoc = null;
@@ -395,8 +419,8 @@
                 
                 // Nuevos listeners
                 fontSizeSelect.addEventListener('change', applyFontSize);
-                toggleTextDisplaySizeBtn.addEventListener('click', openFullscreen);
-                fullscreenCloseBtn.addEventListener('click', closeFullscreen);
+                toggleTextDisplaySizeBtn.addEventListener('click', toggleFullscreen);
+                fullscreenCloseBtn.addEventListener('click', toggleFullscreen);
 
                 window.onbeforeunload = () => {
                     speechSynthesis.cancel();
@@ -899,49 +923,49 @@
                 
                 const paragraphsAndLists = display.querySelectorAll('p, li');
                 const headings = display.querySelectorAll('h1, h2, h3, h4, h5, h6');
-                const allTextElements = [ ...paragraphsAndLists, ...headings ];
 
-                // Remove all possible font size classes
-                allTextElements.forEach(el => {
-                    el.classList.remove('text-sm', 'text-base', 'text-lg', 'text-xl', 'text-2xl', 'text-3xl');
+                // Reset classes
+                [...paragraphsAndLists, ...headings].forEach(el => {
+                    el.className = el.className.replace(/text-(xs|sm|base|lg|xl|2xl|3xl|4xl)/g, '');
                 });
 
                 let pSize, hSize;
 
                 switch(size) {
                     case 'xs':
-                        pSize = 'text-sm';
-                        hSize = 'text-lg';
-                        break;
+                        pSize = 'text-sm'; hSize = 'text-lg'; break;
                     case 'sm':
-                        pSize = 'text-base';
-                        hSize = 'text-xl';
-                        break;
+                        pSize = 'text-base'; hSize = 'text-xl'; break;
                     case 'lg':
-                        pSize = 'text-xl';
-                        hSize = 'text-3xl';
-                        break;
+                        pSize = 'text-xl'; hSize = 'text-3xl'; break;
                     case 'md':
                     default:
-                        pSize = 'text-lg';
-                        hSize = 'text-2xl';
-                        break;
+                        pSize = 'text-lg'; hSize = 'text-2xl'; break;
                 }
 
                 paragraphsAndLists.forEach(el => el.classList.add(pSize));
                 headings.forEach(el => el.classList.add(hSize));
             }
 
-            function openFullscreen() {
-                textReaderDisplayWrapper.classList.add('fullscreen-view');
-                fullscreenCloseBtn.classList.remove('hidden');
-                document.body.classList.add('overflow-hidden');
-            }
+            function toggleFullscreen() {
+                const isFullscreen = document.body.classList.toggle('fullscreen-mode');
 
-            function closeFullscreen() {
-                textReaderDisplayWrapper.classList.remove('fullscreen-view');
-                fullscreenCloseBtn.classList.add('hidden');
-                document.body.classList.remove('overflow-hidden');
+                mainControlsArea.classList.toggle('fullscreen', isFullscreen);
+                textReaderDisplayWrapper.classList.toggle('fullscreen', isFullscreen);
+                fullscreenCloseBtn.classList.toggle('fullscreen', isFullscreen);
+                fullscreenCloseBtn.classList.toggle('hidden', !isFullscreen);
+
+                if (isFullscreen) {
+                    setTimeout(() => {
+                        const controlsHeight = mainControlsArea.offsetHeight;
+                        textReaderDisplayWrapper.style.paddingTop = `${controlsHeight}px`;
+                        if(lastHighlightedParagraph) {
+                           lastHighlightedParagraph.scrollIntoView({ behavior: 'auto', block: 'center' });
+                        }
+                    }, 10);
+                } else {
+                    textReaderDisplayWrapper.style.paddingTop = '';
+                }
             }
 
             function resetPlayerUI() {
