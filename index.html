@@ -345,6 +345,7 @@
             let currentParagraphIndex = 0;
             let currentRepetition = 0;
             let currentSpeechRate = 1.0;
+            let screenWakeLock = null; // <-- NUEVA VARIABLE para el Wake Lock
             const minSpeechRate = 0.5;
             const maxSpeechRate = 2.0;
             const speechRateIncrement = 0.25;
@@ -424,6 +425,7 @@
 
                 window.onbeforeunload = () => {
                     speechSynthesis.cancel();
+                    releaseWakeLock();
                 };
             }
 
@@ -490,6 +492,34 @@
                     loadingSpinner.classList.add('hidden');
                 }
             }
+            
+            // --- NUEVAS FUNCIONES PARA WAKE LOCK ---
+            const requestWakeLock = async () => {
+                if ('wakeLock' in navigator) {
+                    try {
+                        screenWakeLock = await navigator.wakeLock.request('screen');
+                        screenWakeLock.addEventListener('release', () => {
+                            log('Wake Lock fue liberado por el sistema.');
+                            screenWakeLock = null;
+                        });
+                        log('Wake Lock está activo.');
+                    } catch (err) {
+                        log(`Error al solicitar Wake Lock: ${err.name}, ${err.message}`);
+                    }
+                } else {
+                    log('La API Wake Lock no es soportada en este navegador.');
+                }
+            };
+
+            const releaseWakeLock = () => {
+                if (screenWakeLock !== null) {
+                    screenWakeLock.release()
+                        .then(() => {
+                            screenWakeLock = null;
+                            log('Wake Lock liberado.');
+                        });
+                }
+            };
 
             // --- LÓGICA DEL REPRODUCTOR ---
 
@@ -638,18 +668,22 @@
 
                 if (isPaused) {
                     log('Reanudando la reproducción.');
+                    requestWakeLock(); // <-- Solicitar Wake Lock al reanudar
                     speechSynthesis.resume();
                 } else if (isSpeaking) {
                     log('Pausando la reproducción.');
+                    releaseWakeLock(); // <-- Liberar Wake Lock al pausar
                     speechSynthesis.pause();
                 } else {
                     log('Iniciando nueva reproducción.');
+                    requestWakeLock(); // <-- Solicitar Wake Lock al iniciar
                     startPlaybackQueue();
                 }
             }
             
             function stopReadingInternal(resetIndex = false) {
                 log('stopReadingInternal llamado. reseteando índice:', resetIndex);
+                releaseWakeLock(); // <-- Liberar Wake Lock al detener
                 stopRequested = true;
                 if(speechSynthesis.speaking || speechSynthesis.pending) {
                     speechSynthesis.cancel();
@@ -863,32 +897,19 @@
                 }
             }
             
-            // --- FUNCIÓN CORREGIDA ---
             function seek(direction) {
-                // Solo buscar si se está reproduciendo o en pausa.
                 if (!isSpeaking && !isPaused) return;
                 
                 const newIndex = currentParagraphIndex + direction;
 
-                // Comprobar si el nuevo índice es válido.
                 if (newIndex >= 0 && newIndex < paragraphs.length) {
-                    // Queremos interrumpir la locución actual y empezar una nueva
-                    // sin activar la lógica de "parada total" que impediría el reinicio.
-                    
-                    seekInProgress = true; // Evita que el manejador 'onend' de la locución antigua se dispare incorrectamente.
-                    
-                    // Detiene la síntesis de voz actual. Es una operación asíncrona.
+                    seekInProgress = true;
                     speechSynthesis.cancel(); 
-                    
-                    // Actualiza el índice del párrafo y el contador de repeticiones.
                     currentParagraphIndex = newIndex;
                     currentRepetition = 0;
-                    
-                    // Programa la reproducción del nuevo párrafo tras un breve retardo.
-                    // Esto ayuda a prevenir condiciones de carrera con el comando de cancelación del sintetizador de voz.
                     setTimeout(() => {
-                        playCurrentParagraph(); // Inicia la reproducción del nuevo párrafo.
-                        seekInProgress = false; // Restablece la bandera.
+                        playCurrentParagraph(); 
+                        seekInProgress = false;
                     }, 150);
                 }
             }
@@ -1061,5 +1082,3 @@
     </script>
 </body>
 </html>
-```
-
