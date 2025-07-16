@@ -36,7 +36,7 @@
             background-color: #fef08a;
             color: #713f12;
             border-radius: 4px;
-            transition: background-color 0.1s ease-in-out, color 0.1s ease-in-out;
+            transition: background-color: 0.1s ease-in-out, color 0.1s ease-in-out;
             padding: 2px 1px;
             margin: -2px -1px;
         }
@@ -382,7 +382,7 @@
             function setupEventListeners() {
                 bloqueContainer.addEventListener('click', handleBloqueSelection);
                 backToSelectionBtn.addEventListener('click', handleBackToSelection);
-                topicSelect.addEventListener('change', () => prepareAndDisplayText(true));
+                topicSelect.addEventListener('change', updateEpigrafeList);
                 
                 epigrafeDropdownBtn.addEventListener('click', () => {
                     epigrafeDropdownPanel.classList.toggle('hidden');
@@ -395,6 +395,7 @@
                         if (!epigrafeDropdownPanel.classList.contains('hidden')) {
                             epigrafeDropdownPanel.classList.add('hidden');
                             epigrafeDropdownBtn.classList.remove('open');
+                            // Autoplay al cerrar el desplegable si hay algo que leer y no se está reproduciendo
                             if (paragraphs.length > 0 && !isSpeaking) {
                                 handlePlayPause();
                             }
@@ -402,7 +403,8 @@
                     }
                 });
                 
-                epigrafeDropdownPanel.addEventListener('change', () => prepareAndDisplayText(true));
+                // El panel de epígrafes ahora delega el evento 'change'
+                epigrafeDropdownPanel.addEventListener('change', handleEpigrafeSelectionChange);
 
                 selectionToggleBtn.addEventListener('click', () => togglePanel(selectionToggleBtn, selectionPanel));
                 optionsToggleBtn.addEventListener('click', () => togglePanel(optionsToggleBtn, optionsPanel));
@@ -412,6 +414,7 @@
                     currentParagraphIndex = parseInt(paragraphSelect.value, 10);
                     
                     if (isSpeaking) {
+                        // Si ya se está reproduciendo, salta al párrafo y continúa
                         seekInProgress = true;
                         speechSynthesis.cancel();
                         setTimeout(() => {
@@ -424,6 +427,7 @@
                             }
                         }, 100);
                     } else {
+                        // Si no, simplemente inicia la reproducción desde ese punto
                         handlePlayPause();
                     }
                 });
@@ -512,12 +516,14 @@
             const requestWakeLock = async () => {
                 if ('wakeLock' in navigator) {
                     try {
-                        screenWakeLock = await navigator.wakeLock.request('screen');
-                        screenWakeLock.addEventListener('release', () => {
-                            log('Wake Lock fue liberado por el sistema.');
-                            screenWakeLock = null;
-                        });
-                        log('Wake Lock está activo.');
+                        if (screenWakeLock === null) {
+                            screenWakeLock = await navigator.wakeLock.request('screen');
+                            screenWakeLock.addEventListener('release', () => {
+                                log('Wake Lock fue liberado por el sistema.');
+                                screenWakeLock = null;
+                            });
+                            log('Wake Lock está activo.');
+                        }
                     } catch (err) {
                         log(`Error al solicitar Wake Lock: ${err.name}, ${err.message}`);
                     }
@@ -553,8 +559,52 @@
             }
             
             function updateEpigrafeList() {
+                stopReadingInternal(true);
+                
+                const topicId = topicSelect.value;
+                epigrafeDropdownPanel.innerHTML = '';
+                if (!temarioDoc || !topicId) return;
+                const topicElement = temarioDoc.querySelector(`#${topicId}`);
+                if (!topicElement) return;
+
+                const epigrafes = topicElement.querySelectorAll('h2, h3, h4');
+                const selectAllLabel = document.createElement('label');
+                selectAllLabel.className = 'epigrafe-item block font-semibold border-b border-gray-300 mb-1 p-2';
+                selectAllLabel.innerHTML = `<input type="checkbox" id="select-all-epigrafes" class="mr-2 rounded text-blue-600 focus:ring-blue-500"> <span>Tema Completo / Seleccionar Todo</span>`;
+                epigrafeDropdownPanel.appendChild(selectAllLabel);
+
+                epigrafes.forEach((h, index) => {
+                    const label = document.createElement('label');
+                    label.className = 'epigrafe-item block p-2';
+                    label.dataset.index = index;
+                    label.innerHTML = `<input type="checkbox" class="epigrafe-checkbox mr-2 rounded text-blue-600 focus:ring-blue-500"> <span>${h.textContent.trim()}</span>`;
+                    epigrafeDropdownPanel.appendChild(label);
+                });
+
+                prepareAndDisplayText();
+            }
+
+            function handleEpigrafeSelectionChange(event) {
+                if (!event.target.matches('input[type="checkbox"]')) return;
+
+                const selectAllCheckbox = document.getElementById('select-all-epigrafes');
+                const allEpigrafeCheckboxes = epigrafeDropdownPanel.querySelectorAll('.epigrafe-checkbox');
+
+                if (event.target.id === 'select-all-epigrafes') {
+                    allEpigrafeCheckboxes.forEach(cb => cb.checked = event.target.checked);
+                } else {
+                    selectAllCheckbox.checked = [...allEpigrafeCheckboxes].every(cb => cb.checked);
+                }
+
+                epigrafeDropdownPanel.querySelectorAll('.epigrafe-item').forEach(item => {
+                    const checkbox = item.querySelector('input[type="checkbox"]');
+                    item.classList.toggle('selected', checkbox && checkbox.checked);
+                });
+                
+                updateEpigrafeButtonText();
                 prepareAndDisplayText(true);
             }
+
 
             function updateEpigrafeButtonText() {
                 const btnTextSpan = epigrafeDropdownBtn.querySelector('span');
@@ -579,41 +629,6 @@
                 if (selectionChanged) {
                     stopReadingInternal(true);
                 }
-                
-                const topicId = topicSelect.value;
-                epigrafeDropdownPanel.innerHTML = '';
-                if (!temarioDoc || !topicId) return;
-                const topicElement = temarioDoc.querySelector(`#${topicId}`);
-                if (!topicElement) return;
-
-                const epigrafes = topicElement.querySelectorAll('h2, h3, h4');
-                const selectAllLabel = document.createElement('label');
-                selectAllLabel.className = 'epigrafe-item block font-semibold border-b border-gray-300 mb-1 p-2';
-                selectAllLabel.innerHTML = `<input type="checkbox" id="select-all-epigrafes" class="mr-2 rounded text-blue-600 focus:ring-blue-500"> <span>Tema Completo / Seleccionar Todo</span>`;
-                epigrafeDropdownPanel.appendChild(selectAllLabel);
-
-                epigrafes.forEach((h, index) => {
-                    const label = document.createElement('label');
-                    label.className = 'epigrafe-item block p-2';
-                    label.dataset.index = index;
-                    label.innerHTML = `<input type="checkbox" class="epigrafe-checkbox mr-2 rounded text-blue-600 focus:ring-blue-500"> <span>${h.textContent.trim()}</span>`;
-                    epigrafeDropdownPanel.appendChild(label);
-                });
-
-                const selectAllCheckbox = document.getElementById('select-all-epigrafes');
-                const allEpigrafeCheckboxes = epigrafeDropdownPanel.querySelectorAll('.epigrafe-checkbox');
-                selectAllCheckbox.addEventListener('change', (e) => {
-                    allEpigrafeCheckboxes.forEach(cb => cb.checked = e.target.checked);
-                    epigrafeDropdownPanel.dispatchEvent(new Event('change', { bubbles: true }));
-                });
-                epigrafeDropdownPanel.addEventListener('change', () => {
-                    selectAllCheckbox.checked = [...allEpigrafeCheckboxes].every(cb => cb.checked);
-                    epigrafeDropdownPanel.querySelectorAll('.epigrafe-item').forEach(item => {
-                        const checkbox = item.querySelector('input[type="checkbox"]');
-                        item.classList.toggle('selected', checkbox && checkbox.checked);
-                    });
-                    updateEpigrafeButtonText();
-                });
                 
                 const elements = getElementsForSelection();
                 textReaderDisplay.innerHTML = '';
