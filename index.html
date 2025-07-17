@@ -213,11 +213,11 @@
 
         <div id="main-controls-area">
             <div class="flex items-center justify-center gap-4 my-4">
-                <button id="rewind-btn" title="Párrafo anterior" class="text-gray-600 hover:text-blue-600 transition-colors p-2 text-2xl" disabled><i class="fas fa-backward-step"></i></button>
-                <button id="play-pause-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold w-16 h-16 rounded-full shadow-lg transition-transform transform hover:scale-110 flex items-center justify-center text-2xl" disabled>
+                <button id="rewind-btn" title="Párrafo anterior (Flecha Izq.)" class="text-gray-600 hover:text-blue-600 transition-colors p-2 text-2xl" disabled><i class="fas fa-backward-step"></i></button>
+                <button id="play-pause-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold w-16 h-16 rounded-full shadow-lg transition-transform transform hover:scale-110 flex items-center justify-center text-2xl" disabled title="Leer/Pausar (Espacio)">
                     <i id="play-pause-icon" class="fas fa-play"></i>
                 </button>
-                <button id="forward-btn" title="Siguiente Párrafo" class="text-gray-600 hover:text-blue-600 transition-colors p-2 text-2xl" disabled><i class="fas fa-forward-step"></i></button>
+                <button id="forward-btn" title="Siguiente Párrafo (Flecha Der.)" class="text-gray-600 hover:text-blue-600 transition-colors p-2 text-2xl" disabled><i class="fas fa-forward-step"></i></button>
             </div>
 
             <!-- Sección de Opciones Plegable -->
@@ -254,6 +254,7 @@
                                 <option value="sm">Pequeña</option>
                                 <option value="md" selected>Mediana</option>
                                 <option value="lg">Grande</option>
+                                <option value="xl">Muy grande</option>
                             </select>
                         </div>
                          <button id="toggle-text-display-size" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center" title="Vista Pantalla Completa">
@@ -443,10 +444,39 @@
                 toggleTextDisplaySizeBtn.addEventListener('click', toggleFullscreen);
                 fullscreenCloseBtn.addEventListener('click', toggleFullscreen);
 
+                // **NUEVO: Listener para atajos de teclado**
+                document.addEventListener('keydown', handleKeyPress);
+
                 window.onbeforeunload = () => {
                     speechSynthesis.cancel();
                     releaseWakeLock();
                 };
+            }
+
+            // **NUEVO: Handler para atajos de teclado**
+            function handleKeyPress(event) {
+                // Solo activa los atajos si la pantalla del reproductor está visible
+                if (playerScreen.classList.contains('hidden')) return;
+
+                // Evita que los atajos se activen si el foco está en un control de formulario
+                if (['INPUT', 'SELECT', 'BUTTON', 'TEXTAREA'].includes(event.target.tagName)) {
+                    return;
+                }
+
+                switch (event.key) {
+                    case ' ':
+                        event.preventDefault(); // Evita el scroll de la página
+                        if (!playPauseBtn.disabled) handlePlayPause();
+                        break;
+                    case 'ArrowRight':
+                        event.preventDefault();
+                        if (!forwardBtn.disabled) seek(1);
+                        break;
+                    case 'ArrowLeft':
+                        event.preventDefault();
+                        if (!rewindBtn.disabled) seek(-1);
+                        break;
+                }
             }
 
             function togglePanel(button, panel) {
@@ -974,6 +1004,7 @@
                 }
             }
             
+            // **FUNCIÓN MODIFICADA**
             function applyFontSize() {
                 const size = fontSizeSelect.value;
                 const display = textReaderDisplay;
@@ -990,6 +1021,7 @@
                     case 'xs': pSize = 'text-sm'; hSize = 'text-lg'; break;
                     case 'sm': pSize = 'text-base'; hSize = 'text-xl'; break;
                     case 'lg': pSize = 'text-xl'; hSize = 'text-3xl'; break;
+                    case 'xl': pSize = 'text-2xl'; hSize = 'text-4xl'; break; // Nuevo tamaño
                     case 'md':
                     default: pSize = 'text-lg'; hSize = 'text-2xl'; break;
                 }
@@ -1064,24 +1096,24 @@
                  forwardBtn.disabled = !isSpeaking || currentParagraphIndex >= paragraphs.length - 1;
                  
                  switch(state) {
-                     case 'idle':
-                     case 'error':
-                         playPauseIcon.className = 'fas fa-play';
-                         playPauseBtn.title = 'Leer';
-                         speakerIcon.classList.remove('speaker-active');
-                         if(state === 'idle') updateProgressBar();
-                         break;
-                     case 'speaking':
-                         playPauseIcon.className = 'fas fa-pause';
-                         playPauseBtn.title = 'Pausar';
-                         speakerIcon.classList.add('speaker-active');
-                         updateProgressBar();
-                         break;
-                     case 'paused':
-                         playPauseIcon.className = 'fas fa-play';
-                         playPauseBtn.title = 'Continuar';
-                         speakerIcon.classList.remove('speaker-active');
-                         break;
+                       case 'idle':
+                       case 'error':
+                           playPauseIcon.className = 'fas fa-play';
+                           playPauseBtn.title = 'Leer (Espacio)';
+                           speakerIcon.classList.remove('speaker-active');
+                           if(state === 'idle') updateProgressBar();
+                           break;
+                       case 'speaking':
+                           playPauseIcon.className = 'fas fa-pause';
+                           playPauseBtn.title = 'Pausar (Espacio)';
+                           speakerIcon.classList.add('speaker-active');
+                           updateProgressBar();
+                           break;
+                       case 'paused':
+                           playPauseIcon.className = 'fas fa-play';
+                           playPauseBtn.title = 'Continuar (Espacio)';
+                           speakerIcon.classList.remove('speaker-active');
+                           break;
                  }
             }
             
