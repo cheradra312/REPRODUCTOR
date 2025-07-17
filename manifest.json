@@ -1,0 +1,23 @@
+{
+  "name": "Lector de Temarios",
+  "short_name": "Lector",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#f3f4f6",
+  "theme_color": "#3b82f6",
+  "description": "Una aplicación para estudiar temarios por bloques, con lector de voz integrado. Funciona sin conexión.",
+  "icons": [
+    {
+      "src": "https://placehold.co/192x192/3b82f6/white?text=Lector",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://placehold.co/512x512/3b82f6/white?text=Lector",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
