@@ -284,9 +284,6 @@
             <div id="text-reader-display" class="leading-relaxed"></div>
         </div>
     </div>
-
-    <!-- **NUEVO: Audio silencioso para mantener la app activa en segundo plano** -->
-    <audio id="silent-audio" loop src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA"></audio>
     
     <script>
         // Registro del Service Worker para PWA
@@ -357,8 +354,7 @@
             const mainControlsArea = document.getElementById('main-controls-area');
             const installAppBtn = document.getElementById('install-app-btn');
             const voiceSelect = document.getElementById('voice-select');
-            const silentAudio = document.getElementById('silent-audio'); // **NUEVO**
-
+            
             // --- VARIABLES DE ESTADO DEL REPRODUCTOR ---
             let temarioDoc = null;
             let paragraphs = [];
@@ -380,6 +376,7 @@
             const maxSpeechRate = 2.0;
             const speechRateIncrement = 0.25;
             let deferredInstallPrompt = null;
+            let audioContext = null; // **NUEVO: Para Web Audio API**
             
             // --- INICIALIZACIÓN ---
 
@@ -394,6 +391,30 @@
                 populateVoiceList();
                 setInterval(speechReactivation, 3000); 
                 applyFontSize(); 
+            }
+
+            // **NUEVO: Inicializa el AudioContext para mantener la app activa**
+            function initAudioContext() {
+                if (audioContext) return; // Inicializar solo una vez
+                try {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    oscillator.type = 'sine';
+                    oscillator.frequency.setValueAtTime(20, audioContext.currentTime); // Frecuencia inaudible
+                    gainNode.gain.setValueAtTime(0.0001, audioContext.currentTime); // Volumen casi cero
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    oscillator.start();
+                    // Suspendemos el contexto de inmediato, solo lo reanudaremos cuando sea necesario
+                    if (audioContext.state === 'running') {
+                        audioContext.suspend();
+                    }
+                    log('AudioContext para reproducción en segundo plano inicializado.');
+                } catch (e) {
+                    log('Web Audio API no es soportada en este navegador.', e);
+                    audioContext = null; // Asegurarse de que es null si falla
+                }
             }
 
             function setupPWAInstall() {
@@ -779,28 +800,17 @@
                     return;
                 }
                 
-                // **NUEVO: Control del audio silencioso**
-                try {
-                    if (isSpeaking && !isPaused) { // Pausar
-                        silentAudio.pause();
-                        speechSynthesis.pause();
-                    } else if (isPaused) { // Reanudar
-                        silentAudio.play();
-                        speechSynthesis.resume();
-                    } else { // Empezar de cero
-                        silentAudio.play();
-                        startPlaybackQueue();
-                    }
-                } catch (error) {
-                    log("Error al controlar el audio silencioso:", error);
-                    // Continuar con la lógica de voz incluso si el audio silencioso falla
-                    if (isSpeaking && !isPaused) {
-                        speechSynthesis.pause();
-                    } else if (isPaused) {
-                        speechSynthesis.resume();
-                    } else {
-                        startPlaybackQueue();
-                    }
+                initAudioContext(); // Asegurarse de que el contexto de audio existe
+
+                if (isSpeaking && !isPaused) { // Pausar
+                    if (audioContext && audioContext.state === 'running') audioContext.suspend();
+                    speechSynthesis.pause();
+                } else if (isPaused) { // Reanudar
+                    if (audioContext && audioContext.state === 'suspended') audioContext.resume();
+                    speechSynthesis.resume();
+                } else { // Empezar de cero
+                    if (audioContext && audioContext.state === 'suspended') audioContext.resume();
+                    startPlaybackQueue();
                 }
             }
             
@@ -809,9 +819,10 @@
                 stopRequested = true;
                 speechSynthesis.cancel();
                 
-                // **NUEVO: Detener el audio silencioso**
-                silentAudio.pause();
-                silentAudio.currentTime = 0;
+                if (audioContext && audioContext.state === 'running') {
+                    audioContext.suspend();
+                    log('AudioContext suspendido.');
+                }
 
                 if(resetIndex){
                    currentParagraphIndex = 0;
