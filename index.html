@@ -14,6 +14,8 @@
     <link rel="manifest" href="manifest.json">
     <!-- Color para la barra de estado en móviles -->
     <meta name="theme-color" content="#3b82f6">
+    <!-- **NUEVO: Script para el runner de segundo plano** -->
+    <script src="runner.js"></script>
 
     <style>
         body {
@@ -286,7 +288,7 @@
     </div>
     
     <script>
-        // Registro del Service Worker para PWA
+        // La lógica del Service Worker se mantiene igual
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
@@ -376,7 +378,6 @@
             const maxSpeechRate = 2.0;
             const speechRateIncrement = 0.25;
             let deferredInstallPrompt = null;
-            let audioContext = null; // **NUEVO: Para Web Audio API**
             
             // --- INICIALIZACIÓN ---
 
@@ -391,30 +392,6 @@
                 populateVoiceList();
                 setInterval(speechReactivation, 3000); 
                 applyFontSize(); 
-            }
-
-            // **NUEVO: Inicializa el AudioContext para mantener la app activa**
-            function initAudioContext() {
-                if (audioContext) return; // Inicializar solo una vez
-                try {
-                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    const oscillator = audioContext.createOscillator();
-                    const gainNode = audioContext.createGain();
-                    oscillator.type = 'sine';
-                    oscillator.frequency.setValueAtTime(20, audioContext.currentTime); // Frecuencia inaudible
-                    gainNode.gain.setValueAtTime(0.0001, audioContext.currentTime); // Volumen casi cero
-                    oscillator.connect(gainNode);
-                    gainNode.connect(audioContext.destination);
-                    oscillator.start();
-                    // Suspendemos el contexto de inmediato, solo lo reanudaremos cuando sea necesario
-                    if (audioContext.state === 'running') {
-                        audioContext.suspend();
-                    }
-                    log('AudioContext para reproducción en segundo plano inicializado.');
-                } catch (e) {
-                    log('Web Audio API no es soportada en este navegador.', e);
-                    audioContext = null; // Asegurarse de que es null si falla
-                }
             }
 
             function setupPWAInstall() {
@@ -800,16 +777,12 @@
                     return;
                 }
                 
-                initAudioContext(); // Asegurarse de que el contexto de audio existe
-
+                // La lógica de play/pause ahora es más simple, ya que el runner se encarga del segundo plano
                 if (isSpeaking && !isPaused) { // Pausar
-                    if (audioContext && audioContext.state === 'running') audioContext.suspend();
                     speechSynthesis.pause();
                 } else if (isPaused) { // Reanudar
-                    if (audioContext && audioContext.state === 'suspended') audioContext.resume();
                     speechSynthesis.resume();
                 } else { // Empezar de cero
-                    if (audioContext && audioContext.state === 'suspended') audioContext.resume();
                     startPlaybackQueue();
                 }
             }
@@ -819,11 +792,6 @@
                 stopRequested = true;
                 speechSynthesis.cancel();
                 
-                if (audioContext && audioContext.state === 'running') {
-                    audioContext.suspend();
-                    log('AudioContext suspendido.');
-                }
-
                 if(resetIndex){
                    currentParagraphIndex = 0;
                    currentRepetition = 0;
