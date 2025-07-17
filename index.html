@@ -10,6 +10,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <!-- Fuente Inter de Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- **NUEVO: Link al Manifiesto de la PWA** -->
+    <link rel="manifest" href="manifest.json">
+    <!-- **NUEVO: Color para la barra de estado en móviles** -->
+    <meta name="theme-color" content="#3b82f6">
 
     <style>
         body {
@@ -19,11 +23,9 @@
         body.fullscreen-mode {
             overflow: hidden;
         }
-        /* Ocultar elementos */
         .hidden {
             display: none;
         }
-        /* Estilos para las tarjetas de selección */
         .bloque-card {
             transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
         }
@@ -31,7 +33,6 @@
             transform: translateY(-5px);
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
-        /* Estilos del reproductor (existentes) */
         .highlight {
             background-color: #fef08a;
             color: #713f12;
@@ -58,7 +59,6 @@
             position: relative; 
             transition: all 0.3s ease-in-out;
         }
-        /* Estilo para la vista de pantalla completa */
         #text-reader-display-wrapper.fullscreen {
             position: fixed;
             top: 0;
@@ -95,7 +95,6 @@
             from { transform: scale(1); opacity: 1; }
             to { transform: scale(1.2); opacity: 0.8; }
         }
-        /* Estilos para la lista de epígrafes */
         .epigrafe-item {
             display: flex;
             align-items: center;
@@ -106,17 +105,16 @@
             transition: background-color 0.2s;
         }
         .epigrafe-item:hover {
-            background-color: #f3f4f6; /* gray-100 */
+            background-color: #f3f4f6;
         }
         .epigrafe-item.selected {
-            background-color: #dbeafe; /* blue-100 */
-            color: #1e40af; /* blue-800 */
+            background-color: #dbeafe;
+            color: #1e40af;
             font-weight: 500;
         }
         #epigrafe-dropdown-btn.open .fa-chevron-down {
             transform: rotate(180deg);
         }
-        /* Estilos para secciones plegables */
         .collapsible-button .fa-chevron-up {
             transition: transform 0.3s ease;
         }
@@ -126,7 +124,6 @@
         .collapsible-panel {
             transition: max-height 0.3s ease-in-out, padding 0.3s ease-in-out;
         }
-        /* Estilos para controles en pantalla completa */
         #main-controls-area.fullscreen {
             position: fixed;
             top: 0;
@@ -151,7 +148,14 @@
 
     <!-- Pantalla de Selección de Bloque -->
     <div id="selection-screen" class="w-full max-w-4xl text-center">
-        <h1 class="text-4xl md:text-5xl font-bold text-gray-900 mb-8">Selecciona un Bloque Temático</h1>
+        <h1 class="text-4xl md:text-5xl font-bold text-gray-900 mb-4">Selecciona un Bloque Temático</h1>
+        <!-- **NUEVO: Botón de instalación de la PWA** -->
+        <div class="mb-8">
+            <button id="install-app-btn" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-transform transform hover:scale-105 flex items-center gap-3 mx-auto">
+                <i class="fas fa-download"></i>
+                Instalar Aplicación
+            </button>
+        </div>
         <div id="bloque-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <!-- Las tarjetas de bloque se generarán aquí con JavaScript -->
         </div>
@@ -276,6 +280,19 @@
     </div>
     
     <script>
+        // **NUEVO: Registro del Service Worker para PWA**
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registrado con éxito:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('Fallo en el registro del ServiceWorker:', error);
+                    });
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const DEBUG = true;
             function log(...args) {
@@ -329,6 +346,7 @@
             const fontSizeSelect = document.getElementById('font-size-select');
             const fullscreenCloseBtn = document.getElementById('fullscreen-close-btn');
             const mainControlsArea = document.getElementById('main-controls-area');
+            const installAppBtn = document.getElementById('install-app-btn'); // **NUEVO**
 
             // --- VARIABLES DE ESTADO DEL REPRODUCTOR ---
             let temarioDoc = null;
@@ -341,7 +359,7 @@
             let isSpeaking = false;
             let isPaused = false;
             let stopRequested = false;
-            let seekInProgress = false; // Usado para interrupciones controladas (seek, cambio de velocidad)
+            let seekInProgress = false;
             let isLooping = false;
             let currentParagraphIndex = 0;
             let currentRepetition = 0;
@@ -350,10 +368,12 @@
             const minSpeechRate = 0.5;
             const maxSpeechRate = 2.0;
             const speechRateIncrement = 0.25;
+            let deferredInstallPrompt = null; // **NUEVO**
             
             // --- INICIALIZACIÓN ---
 
             function initializeApp() {
+                setupPWAInstall(); // **NUEVO**
                 createSelectionCards();
                 setupEventListeners();
                 setupMediaSession();
@@ -363,6 +383,38 @@
                 populateVoiceList();
                 setInterval(speechReactivation, 3000); 
                 applyFontSize(); 
+            }
+
+            // **NUEVO: Lógica de instalación de la PWA**
+            function setupPWAInstall() {
+                window.addEventListener('beforeinstallprompt', (e) => {
+                    // Prevenir que el navegador muestre el prompt por defecto
+                    e.preventDefault();
+                    // Guardar el evento para poder lanzarlo después
+                    deferredInstallPrompt = e;
+                    // Mostrar nuestro botón de instalación
+                    installAppBtn.classList.remove('hidden');
+                    log('beforeinstallprompt event fired, install button shown');
+                });
+
+                installAppBtn.addEventListener('click', async () => {
+                    if (!deferredInstallPrompt) {
+                        return;
+                    }
+                    // Mostrar el prompt de instalación
+                    deferredInstallPrompt.prompt();
+                    const { outcome } = await deferredInstallPrompt.userChoice;
+                    log(`User response to the install prompt: ${outcome}`);
+                    // Ya no necesitaremos el prompt, se usa una sola vez
+                    deferredInstallPrompt = null;
+                    // Ocultar el botón de instalación
+                    installAppBtn.classList.add('hidden');
+                });
+
+                window.addEventListener('appinstalled', () => {
+                    deferredInstallPrompt = null;
+                    log('PWA was installed');
+                });
             }
             
             function createSelectionCards() {
