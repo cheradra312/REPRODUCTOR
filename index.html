@@ -10,9 +10,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <!-- Fuente Inter de Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- **NUEVO: Link al Manifiesto de la PWA** -->
+    <!-- Link al Manifiesto de la PWA -->
     <link rel="manifest" href="manifest.json">
-    <!-- **NUEVO: Color para la barra de estado en móviles** -->
+    <!-- Color para la barra de estado en móviles -->
     <meta name="theme-color" content="#3b82f6">
 
     <style>
@@ -149,7 +149,7 @@
     <!-- Pantalla de Selección de Bloque -->
     <div id="selection-screen" class="w-full max-w-4xl text-center">
         <h1 class="text-4xl md:text-5xl font-bold text-gray-900 mb-4">Selecciona un Bloque Temático</h1>
-        <!-- **NUEVO: Botón de instalación de la PWA** -->
+        <!-- Botón de instalación de la PWA -->
         <div class="mb-8">
             <button id="install-app-btn" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-transform transform hover:scale-105 flex items-center gap-3 mx-auto">
                 <i class="fas fa-download"></i>
@@ -231,7 +231,7 @@
                     <i class="fas fa-chevron-up"></i>
                 </button>
                 <div id="options-panel" class="collapsible-panel p-4 border-t border-gray-200">
-                    <div class="flex justify-center items-center gap-6 flex-wrap">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-center">
                         <div class="flex items-center gap-2">
                             <label for="repeat-select" class="text-sm font-medium text-gray-700">Repetir:</label>
                             <select id="repeat-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5">
@@ -241,10 +241,10 @@
                                 <option value="4">4 veces</option>
                                 <option value="5">5 veces</option>
                             </select>
+                            <button id="loop-btn" title="Repetir en bucle" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center transition-colors flex-shrink-0">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
                         </div>
-                        <button id="loop-btn" title="Repetir en bucle" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center transition-colors">
-                            <i class="fas fa-sync-alt"></i>
-                        </button>
                          <div class="flex items-center gap-2">
                             <label class="text-sm font-medium text-gray-700">Velocidad:</label>
                             <button id="speed-down-btn" title="Disminuir Velocidad" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center" disabled><i class="fas fa-minus"></i></button>
@@ -260,10 +260,17 @@
                                 <option value="lg">Grande</option>
                                 <option value="xl">Muy grande</option>
                             </select>
+                            <button id="toggle-text-display-size" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center flex-shrink-0" title="Vista Pantalla Completa">
+                                <i class="fas fa-expand-alt"></i>
+                            </button>
                         </div>
-                         <button id="toggle-text-display-size" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center" title="Vista Pantalla Completa">
-                             <i class="fas fa-expand-alt"></i>
-                         </button>
+                        <!-- **NUEVO: Selector de Voz** -->
+                        <div class="flex items-center gap-2 lg:col-span-3 justify-center">
+                            <label for="voice-select" class="text-sm font-medium text-gray-700">Voz:</label>
+                            <select id="voice-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5 w-full max-w-xs" disabled>
+                                <option>Cargando voces...</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -280,7 +287,7 @@
     </div>
     
     <script>
-        // **NUEVO: Registro del Service Worker para PWA**
+        // Registro del Service Worker para PWA
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
@@ -346,7 +353,8 @@
             const fontSizeSelect = document.getElementById('font-size-select');
             const fullscreenCloseBtn = document.getElementById('fullscreen-close-btn');
             const mainControlsArea = document.getElementById('main-controls-area');
-            const installAppBtn = document.getElementById('install-app-btn'); // **NUEVO**
+            const installAppBtn = document.getElementById('install-app-btn');
+            const voiceSelect = document.getElementById('voice-select'); // **NUEVO**
 
             // --- VARIABLES DE ESTADO DEL REPRODUCTOR ---
             let temarioDoc = null;
@@ -368,12 +376,12 @@
             const minSpeechRate = 0.5;
             const maxSpeechRate = 2.0;
             const speechRateIncrement = 0.25;
-            let deferredInstallPrompt = null; // **NUEVO**
+            let deferredInstallPrompt = null;
             
             // --- INICIALIZACIÓN ---
 
             function initializeApp() {
-                setupPWAInstall(); // **NUEVO**
+                setupPWAInstall();
                 createSelectionCards();
                 setupEventListeners();
                 setupMediaSession();
@@ -385,29 +393,20 @@
                 applyFontSize(); 
             }
 
-            // **NUEVO: Lógica de instalación de la PWA**
             function setupPWAInstall() {
                 window.addEventListener('beforeinstallprompt', (e) => {
-                    // Prevenir que el navegador muestre el prompt por defecto
                     e.preventDefault();
-                    // Guardar el evento para poder lanzarlo después
                     deferredInstallPrompt = e;
-                    // Mostrar nuestro botón de instalación
                     installAppBtn.classList.remove('hidden');
                     log('beforeinstallprompt event fired, install button shown');
                 });
 
                 installAppBtn.addEventListener('click', async () => {
-                    if (!deferredInstallPrompt) {
-                        return;
-                    }
-                    // Mostrar el prompt de instalación
+                    if (!deferredInstallPrompt) return;
                     deferredInstallPrompt.prompt();
                     const { outcome } = await deferredInstallPrompt.userChoice;
                     log(`User response to the install prompt: ${outcome}`);
-                    // Ya no necesitaremos el prompt, se usa una sola vez
                     deferredInstallPrompt = null;
-                    // Ocultar el botón de instalación
                     installAppBtn.classList.add('hidden');
                 });
 
@@ -457,7 +456,6 @@
                 });
                 
                 epigrafeDropdownPanel.addEventListener('change', handleEpigrafeSelectionChange);
-
                 selectionToggleBtn.addEventListener('click', () => togglePanel(selectionToggleBtn, selectionPanel));
                 optionsToggleBtn.addEventListener('click', () => togglePanel(optionsToggleBtn, optionsPanel));
 
@@ -488,6 +486,7 @@
                 speedUpBtn.addEventListener('click', increaseSpeed);
                 speedDownBtn.addEventListener('click', decreaseSpeed);
                 loopBtn.addEventListener('click', toggleLoop);
+                voiceSelect.addEventListener('change', handleVoiceChange); // **NUEVO**
                 
                 fontSizeSelect.addEventListener('change', applyFontSize);
                 toggleTextDisplaySizeBtn.addEventListener('click', toggleFullscreen);
@@ -615,13 +614,41 @@
                 }
             };
 
+            // **FUNCIÓN MODIFICADA**
             function populateVoiceList() {
-                if (voicesReady) return;
-                voices = speechSynthesis.getVoices();
-                if(voices.length > 0){
-                    log('Voces cargadas:', voices.length);
-                    voicesReady = true;
-                }
+                // Usamos un timeout para dar tiempo a los navegadores a cargar las voces, especialmente en la primera carga
+                setTimeout(() => {
+                    if (voicesReady && voiceSelect.options.length > 1) return;
+                    voices = speechSynthesis.getVoices();
+                    if (voices.length > 0) {
+                        log('Voces cargadas:', voices.length);
+                        voicesReady = true;
+
+                        voiceSelect.innerHTML = ''; // Limpiar "Cargando..."
+                        const spanishVoices = voices.filter(v => v.lang.startsWith('es'));
+
+                        if (spanishVoices.length > 0) {
+                            spanishVoices.forEach(voice => {
+                                const option = document.createElement('option');
+                                option.value = voice.name;
+                                option.textContent = `${voice.name} (${voice.lang})`;
+                                voiceSelect.appendChild(option);
+                            });
+                            voiceSelect.disabled = false;
+                        } else {
+                            const option = document.createElement('option');
+                            option.textContent = 'No hay voces en español';
+                            voiceSelect.appendChild(option);
+                            voiceSelect.disabled = true;
+                        }
+                        
+                        if (paragraphs.length > 0) {
+                            updateUIState(isPaused ? 'paused' : 'idle');
+                        }
+                    } else {
+                         log('El listado de voces está vacío. Se intentará de nuevo.');
+                    }
+                }, 200);
             }
             
             function speechReactivation() {
@@ -746,7 +773,7 @@
 
             function handlePlayPause() {
                 if (!voicesReady){
-                    readerStatus.textContent = "Las voces del navegador aún no están listas.";
+                    readerStatus.textContent = "Las voces del navegador aún no están listas. Intentando de nuevo...";
                     populateVoiceList();
                     return;
                 }
@@ -901,9 +928,12 @@
                 utterance = new SpeechSynthesisUtterance(textToSpeak);
                 utterance.rate = currentSpeechRate;
                 
-                const spanishVoice = voices.find(v => v.lang.startsWith('es-ES') || v.lang.startsWith('es-MX'));
-                utterance.voice = spanishVoice || voices.find(v => v.lang.startsWith('es')) || null;
+                // **LÓGICA DE VOZ MODIFICADA**
+                const selectedVoiceName = voiceSelect.value;
+                const selectedVoice = voices.find(v => v.name === selectedVoiceName);
+                utterance.voice = selectedVoice || null;
                 utterance.lang = utterance.voice ? utterance.voice.lang : 'es-ES';
+
 
                 utterance.onstart = () => {
                     isSpeaking = true; isPaused = false; stopRequested = false;
@@ -1015,6 +1045,14 @@
                 loopBtn.classList.toggle('text-white', isLooping);
                 loopBtn.classList.toggle('bg-gray-200', !isLooping);
                 loopBtn.classList.toggle('text-gray-700', !isLooping);
+            }
+
+            // **NUEVO: Handler para cambio de voz**
+            function handleVoiceChange() {
+                if (isSpeaking && !isPaused) {
+                    // Si está hablando, reiniciar con la nueva voz
+                    updateSpeed(); // Reutilizo esta función que ya hace el restart
+                }
             }
 
             function updateSpeed() {
