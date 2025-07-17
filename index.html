@@ -356,6 +356,7 @@
             function initializeApp() {
                 createSelectionCards();
                 setupEventListeners();
+                setupMediaSession();
                 if (speechSynthesis.onvoiceschanged !== undefined) {
                     speechSynthesis.onvoiceschanged = populateVoiceList;
                 }
@@ -396,7 +397,6 @@
                         if (!epigrafeDropdownPanel.classList.contains('hidden')) {
                             epigrafeDropdownPanel.classList.add('hidden');
                             epigrafeDropdownBtn.classList.remove('open');
-                            // Autoplay al cerrar el desplegable si hay algo que leer y no se está reproduciendo
                             if (paragraphs.length > 0 && !isSpeaking) {
                                 handlePlayPause();
                             }
@@ -404,7 +404,6 @@
                     }
                 });
                 
-                // El panel de epígrafes ahora delega el evento 'change'
                 epigrafeDropdownPanel.addEventListener('change', handleEpigrafeSelectionChange);
 
                 selectionToggleBtn.addEventListener('click', () => togglePanel(selectionToggleBtn, selectionPanel));
@@ -415,7 +414,6 @@
                     currentParagraphIndex = parseInt(paragraphSelect.value, 10);
                     
                     if (isSpeaking) {
-                        // Si ya se está reproduciendo, salta al párrafo y continúa
                         seekInProgress = true;
                         speechSynthesis.cancel();
                         setTimeout(() => {
@@ -428,7 +426,6 @@
                             }
                         }, 100);
                     } else {
-                        // Si no, simplemente inicia la reproducción desde ese punto
                         handlePlayPause();
                     }
                 });
@@ -444,7 +441,6 @@
                 toggleTextDisplaySizeBtn.addEventListener('click', toggleFullscreen);
                 fullscreenCloseBtn.addEventListener('click', toggleFullscreen);
 
-                // **NUEVO: Listener para atajos de teclado**
                 document.addEventListener('keydown', handleKeyPress);
 
                 window.onbeforeunload = () => {
@@ -453,19 +449,15 @@
                 };
             }
 
-            // **NUEVO: Handler para atajos de teclado**
             function handleKeyPress(event) {
-                // Solo activa los atajos si la pantalla del reproductor está visible
                 if (playerScreen.classList.contains('hidden')) return;
-
-                // Evita que los atajos se activen si el foco está en un control de formulario
                 if (['INPUT', 'SELECT', 'BUTTON', 'TEXTAREA'].includes(event.target.tagName)) {
                     return;
                 }
 
                 switch (event.key) {
                     case ' ':
-                        event.preventDefault(); // Evita el scroll de la página
+                        event.preventDefault(); 
                         if (!playPauseBtn.disabled) handlePlayPause();
                         break;
                     case 'ArrowRight':
@@ -728,6 +720,7 @@
                 if (!isSpeaking) {
                     resetState();
                 }
+                 updateMediaSessionState('none');
             }
 
             function getElementsForSelection() {
@@ -865,6 +858,7 @@
                     highlightCurrentParagraph();
                     updateUIState('speaking'); 
                     requestWakeLock();
+                    updateMediaSessionMetadata();
                 };
                 utterance.onpause = () => { 
                     isPaused = true; 
@@ -1004,7 +998,6 @@
                 }
             }
             
-            // **FUNCIÓN MODIFICADA**
             function applyFontSize() {
                 const size = fontSizeSelect.value;
                 const display = textReaderDisplay;
@@ -1013,15 +1006,15 @@
                 const headings = display.querySelectorAll('h1, h2, h3, h4, h5, h6');
 
                 [...paragraphsAndLists, ...headings].forEach(el => {
-                    el.className = el.className.replace(/text-(xs|sm|base|lg|xl|2xl|3xl|4xl)/g, '');
+                    el.className = el.className.replace(/text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl)/g, '');
                 });
 
                 let pSize, hSize;
                 switch(size) {
-                    case 'xs': pSize = 'text-sm'; hSize = 'text-lg'; break;
-                    case 'sm': pSize = 'text-base'; hSize = 'text-xl'; break;
-                    case 'lg': pSize = 'text-xl'; hSize = 'text-3xl'; break;
-                    case 'xl': pSize = 'text-2xl'; hSize = 'text-4xl'; break; // Nuevo tamaño
+                    case 'xs': pSize = 'text-xs'; hSize = 'text-base'; break;
+                    case 'sm': pSize = 'text-sm'; hSize = 'text-lg'; break;
+                    case 'lg': pSize = 'text-2xl'; hSize = 'text-4xl'; break;
+                    case 'xl': pSize = 'text-3xl'; hSize = 'text-5xl'; break; 
                     case 'md':
                     default: pSize = 'text-lg'; hSize = 'text-2xl'; break;
                 }
@@ -1102,17 +1095,20 @@
                            playPauseBtn.title = 'Leer (Espacio)';
                            speakerIcon.classList.remove('speaker-active');
                            if(state === 'idle') updateProgressBar();
+                           updateMediaSessionState('paused');
                            break;
                        case 'speaking':
                            playPauseIcon.className = 'fas fa-pause';
                            playPauseBtn.title = 'Pausar (Espacio)';
                            speakerIcon.classList.add('speaker-active');
                            updateProgressBar();
+                           updateMediaSessionState('playing');
                            break;
                        case 'paused':
                            playPauseIcon.className = 'fas fa-play';
                            playPauseBtn.title = 'Continuar (Espacio)';
                            speakerIcon.classList.remove('speaker-active');
+                           updateMediaSessionState('paused');
                            break;
                  }
             }
@@ -1122,6 +1118,52 @@
                 progressBar.style.width = `${progress}%`;
                 progressText.textContent = `${Math.round(progress)}%`;
             }
+
+            // --- MEDIA SESSION API ---
+            function setupMediaSession() {
+                if ('mediaSession' in navigator) {
+                    log('Configurando Media Session API');
+                    navigator.mediaSession.setActionHandler('play', () => {
+                        log('MediaSession: Play');
+                        if (!playPauseBtn.disabled) handlePlayPause();
+                    });
+                    navigator.mediaSession.setActionHandler('pause', () => {
+                        log('MediaSession: Pause');
+                        if (!playPauseBtn.disabled) handlePlayPause();
+                    });
+                    navigator.mediaSession.setActionHandler('previoustrack', () => {
+                        log('MediaSession: Previous Track');
+                        if (!rewindBtn.disabled) seek(-1);
+                    });
+                    navigator.mediaSession.setActionHandler('nexttrack', () => {
+                        log('MediaSession: Next Track');
+                        if (!forwardBtn.disabled) seek(1);
+                    });
+                } else {
+                    log('Media Session API no es soportada.');
+                }
+            }
+
+            function updateMediaSessionMetadata() {
+                if ('mediaSession' in navigator) {
+                    const topicOption = topicSelect.options[topicSelect.selectedIndex];
+                    const topicTitle = topicOption ? topicOption.textContent : 'Lector de Temarios';
+                    const paragraphText = paragraphs[currentParagraphIndex]?.text || 'Párrafo';
+
+                    navigator.mediaSession.metadata = new MediaMetadata({
+                        title: paragraphText.substring(0, 50) + '...',
+                        artist: topicTitle,
+                        album: playerTitle.textContent.replace('Lector: ', ''),
+                    });
+                }
+            }
+
+            function updateMediaSessionState(state) {
+                 if ('mediaSession' in navigator) {
+                    navigator.mediaSession.playbackState = state;
+                 }
+            }
+
 
             initializeApp();
         });
