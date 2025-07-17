@@ -264,7 +264,6 @@
                                 <i class="fas fa-expand-alt"></i>
                             </button>
                         </div>
-                        <!-- **NUEVO: Selector de Voz** -->
                         <div class="flex items-center gap-2 lg:col-span-3 justify-center">
                             <label for="voice-select" class="text-sm font-medium text-gray-700">Voz:</label>
                             <select id="voice-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5 w-full max-w-xs" disabled>
@@ -285,6 +284,9 @@
             <div id="text-reader-display" class="leading-relaxed"></div>
         </div>
     </div>
+
+    <!-- **NUEVO: Audio silencioso para mantener la app activa en segundo plano** -->
+    <audio id="silent-audio" loop src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA"></audio>
     
     <script>
         // Registro del Service Worker para PWA
@@ -354,7 +356,8 @@
             const fullscreenCloseBtn = document.getElementById('fullscreen-close-btn');
             const mainControlsArea = document.getElementById('main-controls-area');
             const installAppBtn = document.getElementById('install-app-btn');
-            const voiceSelect = document.getElementById('voice-select'); // **NUEVO**
+            const voiceSelect = document.getElementById('voice-select');
+            const silentAudio = document.getElementById('silent-audio'); // **NUEVO**
 
             // --- VARIABLES DE ESTADO DEL REPRODUCTOR ---
             let temarioDoc = null;
@@ -486,7 +489,7 @@
                 speedUpBtn.addEventListener('click', increaseSpeed);
                 speedDownBtn.addEventListener('click', decreaseSpeed);
                 loopBtn.addEventListener('click', toggleLoop);
-                voiceSelect.addEventListener('change', handleVoiceChange); // **NUEVO**
+                voiceSelect.addEventListener('change', handleVoiceChange);
                 
                 fontSizeSelect.addEventListener('change', applyFontSize);
                 toggleTextDisplaySizeBtn.addEventListener('click', toggleFullscreen);
@@ -614,9 +617,7 @@
                 }
             };
 
-            // **FUNCIÓN MODIFICADA**
             function populateVoiceList() {
-                // Usamos un timeout para dar tiempo a los navegadores a cargar las voces, especialmente en la primera carga
                 setTimeout(() => {
                     if (voicesReady && voiceSelect.options.length > 1) return;
                     voices = speechSynthesis.getVoices();
@@ -624,7 +625,7 @@
                         log('Voces cargadas:', voices.length);
                         voicesReady = true;
 
-                        voiceSelect.innerHTML = ''; // Limpiar "Cargando..."
+                        voiceSelect.innerHTML = '';
                         const spanishVoices = voices.filter(v => v.lang.startsWith('es'));
 
                         if (spanishVoices.length > 0) {
@@ -777,13 +778,29 @@
                     populateVoiceList();
                     return;
                 }
-
-                if (isPaused) {
-                    speechSynthesis.resume();
-                } else if (isSpeaking) {
-                    speechSynthesis.pause();
-                } else {
-                    startPlaybackQueue();
+                
+                // **NUEVO: Control del audio silencioso**
+                try {
+                    if (isSpeaking && !isPaused) { // Pausar
+                        silentAudio.pause();
+                        speechSynthesis.pause();
+                    } else if (isPaused) { // Reanudar
+                        silentAudio.play();
+                        speechSynthesis.resume();
+                    } else { // Empezar de cero
+                        silentAudio.play();
+                        startPlaybackQueue();
+                    }
+                } catch (error) {
+                    log("Error al controlar el audio silencioso:", error);
+                    // Continuar con la lógica de voz incluso si el audio silencioso falla
+                    if (isSpeaking && !isPaused) {
+                        speechSynthesis.pause();
+                    } else if (isPaused) {
+                        speechSynthesis.resume();
+                    } else {
+                        startPlaybackQueue();
+                    }
                 }
             }
             
@@ -792,6 +809,10 @@
                 stopRequested = true;
                 speechSynthesis.cancel();
                 
+                // **NUEVO: Detener el audio silencioso**
+                silentAudio.pause();
+                silentAudio.currentTime = 0;
+
                 if(resetIndex){
                    currentParagraphIndex = 0;
                    currentRepetition = 0;
@@ -928,7 +949,6 @@
                 utterance = new SpeechSynthesisUtterance(textToSpeak);
                 utterance.rate = currentSpeechRate;
                 
-                // **LÓGICA DE VOZ MODIFICADA**
                 const selectedVoiceName = voiceSelect.value;
                 const selectedVoice = voices.find(v => v.name === selectedVoiceName);
                 utterance.voice = selectedVoice || null;
@@ -1047,11 +1067,9 @@
                 loopBtn.classList.toggle('text-gray-700', !isLooping);
             }
 
-            // **NUEVO: Handler para cambio de voz**
             function handleVoiceChange() {
                 if (isSpeaking && !isPaused) {
-                    // Si está hablando, reiniciar con la nueva voz
-                    updateSpeed(); // Reutilizo esta función que ya hace el restart
+                    updateSpeed();
                 }
             }
 
