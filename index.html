@@ -14,7 +14,7 @@
     <link rel="manifest" href="manifest.json">
     <!-- Color para la barra de estado en móviles -->
     <meta name="theme-color" content="#3b82f6">
-    <!-- **NUEVO: Script para el runner de segundo plano** -->
+    <!-- Script para el runner de segundo plano (si existe) -->
     <script src="runner.js"></script>
 
     <style>
@@ -262,9 +262,7 @@
                                 <option value="lg">Grande</option>
                                 <option value="xl">Muy grande</option>
                             </select>
-                            <button id="toggle-text-display-size" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center flex-shrink-0" title="Vista Pantalla Completa">
-                                <i class="fas fa-expand-alt"></i>
-                            </button>
+                            <!-- CAMBIO: Botón de pantalla completa movido fuera de este panel -->
                         </div>
                         <div class="flex items-center gap-2 lg:col-span-3 justify-center">
                             <label for="voice-select" class="text-sm font-medium text-gray-700">Voz:</label>
@@ -282,13 +280,17 @@
             <div id="reader-status" class="text-center text-sm text-gray-500">Cargando...</div>
         </div>
 
-        <div id="text-reader-display-wrapper">
+        <!-- CAMBIO: El wrapper del display ahora es 'relative' para posicionar el botón de pantalla completa -->
+        <div id="text-reader-display-wrapper" class="relative">
+            <!-- CAMBIO: Botón de pantalla completa movido aquí -->
+            <button id="toggle-text-display-size" class="absolute top-2 right-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center flex-shrink-0 z-10" title="Vista Pantalla Completa">
+                <i class="fas fa-expand-alt"></i>
+            </button>
             <div id="text-reader-display" class="leading-relaxed"></div>
         </div>
     </div>
     
     <script>
-        // La lógica del Service Worker se mantiene igual
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
@@ -390,7 +392,8 @@
                     speechSynthesis.onvoiceschanged = populateVoiceList;
                 }
                 populateVoiceList();
-                setInterval(speechReactivation, 3000); 
+                // Se comenta la reactivación por posible conflicto con el evento onend
+                // setInterval(speechReactivation, 3000); 
                 applyFontSize(); 
             }
 
@@ -770,6 +773,7 @@
                 }
             }
 
+            // CAMBIO: Lógica de Play/Pause simplificada para asegurar el cambio de icono
             function handlePlayPause() {
                 if (!voicesReady){
                     readerStatus.textContent = "Las voces del navegador aún no están listas. Intentando de nuevo...";
@@ -777,12 +781,14 @@
                     return;
                 }
                 
-                // La lógica de play/pause ahora es más simple, ya que el runner se encarga del segundo plano
-                if (isSpeaking && !isPaused) { // Pausar
+                if (speechSynthesis.speaking && !isPaused) { // Si está hablando -> Pausar
                     speechSynthesis.pause();
-                } else if (isPaused) { // Reanudar
+                    // El evento onpause se encargará de actualizar el estado, pero forzamos el icono por si acaso
+                    updateUIState('paused'); 
+                } else if (isPaused) { // Si está pausado -> Reanudar
                     speechSynthesis.resume();
-                } else { // Empezar de cero
+                    // El evento onresume se encargará de actualizar el estado
+                } else { // Si no está ni hablando ni pausado -> Empezar
                     startPlaybackQueue();
                 }
             }
@@ -953,6 +959,7 @@
                 };
                 utterance.onboundary = handleWordBoundary;
 
+                // CAMBIO: Lógica de repetición ajustada para mayor precisión
                 utterance.onend = () => {
                     releaseWakeLock();
                     if (seekInProgress) return;
@@ -961,11 +968,12 @@
                         return;
                     }
                     
-                    currentRepetition++;
                     if (lastHighlightedSpan) lastHighlightedSpan.classList.remove('highlight');
                     
                     const totalRepetitions = parseInt(repeatSelect.value, 10);
-                    if (currentRepetition < totalRepetitions) {
+                    // Comprueba si las repeticiones hechas son menores que las deseadas menos uno (la primera reproducción no cuenta como repetición)
+                    if (currentRepetition < totalRepetitions - 1) {
+                         currentRepetition++;
                          setTimeout(() => playCurrentParagraph(), 50);
                     } else {
                         currentParagraphIndex++;
