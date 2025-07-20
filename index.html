@@ -164,7 +164,12 @@
     </div>
 
     <!-- Pantalla del Reproductor (inicialmente oculta) -->
-    <div id="player-screen" class="w-full max-w-6xl bg-white rounded-xl shadow-2xl p-6 md:p-8 hidden">
+    <!-- CAMBIO: Añadida clase 'relative' para posicionar el botón de pantalla completa -->
+    <div id="player-screen" class="w-full max-w-6xl bg-white rounded-xl shadow-2xl p-6 md:p-8 hidden relative">
+        <!-- CAMBIO: Botón de pantalla completa movido aquí -->
+        <button id="toggle-text-display-size" class="absolute top-6 right-8 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center flex-shrink-0 z-10" title="Vista Pantalla Completa">
+            <i class="fas fa-expand-alt"></i>
+        </button>
         <button id="fullscreen-close-btn" title="Cerrar vista completa" class="hidden bg-red-500 hover:bg-red-600 text-white font-bold w-10 h-10 rounded-full shadow-lg flex items-center justify-center text-lg">
             <i class="fas fa-times"></i>
         </button>
@@ -224,7 +229,6 @@
                     <i id="play-pause-icon" class="fas fa-play"></i>
                 </button>
                 <button id="forward-btn" title="Siguiente Párrafo (Flecha Der.)" class="text-gray-600 hover:text-blue-600 transition-colors p-2 text-2xl" disabled><i class="fas fa-forward-step"></i></button>
-                <!-- CAMBIO: Botón de Modo Estudio añadido -->
                 <button id="study-mode-btn" title="Modo Estudio" class="text-gray-600 hover:text-blue-600 transition-colors p-2 text-2xl" disabled>
                     <i class="fas fa-brain"></i>
                 </button>
@@ -283,10 +287,8 @@
             <div id="reader-status" class="text-center text-sm text-gray-500">Cargando...</div>
         </div>
 
-        <div id="text-reader-display-wrapper" class="relative">
-            <button id="toggle-text-display-size" class="absolute top-2 right-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold w-8 h-8 rounded-full shadow-md flex items-center justify-center flex-shrink-0 z-10" title="Vista Pantalla Completa">
-                <i class="fas fa-expand-alt"></i>
-            </button>
+        <div id="text-reader-display-wrapper">
+            <!-- CAMBIO: Botón de pantalla completa eliminado de aquí -->
             <div id="text-reader-display" class="leading-relaxed"></div>
         </div>
     </div>
@@ -359,7 +361,7 @@
             const mainControlsArea = document.getElementById('main-controls-area');
             const installAppBtn = document.getElementById('install-app-btn');
             const voiceSelect = document.getElementById('voice-select');
-            const studyModeBtn = document.getElementById('study-mode-btn'); // CAMBIO
+            const studyModeBtn = document.getElementById('study-mode-btn');
             
             // --- VARIABLES DE ESTADO DEL REPRODUCTOR ---
             let temarioDoc = null;
@@ -382,8 +384,8 @@
             const maxSpeechRate = 2.0;
             const speechRateIncrement = 0.25;
             let deferredInstallPrompt = null;
-            let isStudyMode = false; // CAMBIO
-            let isReviewingEpigrafe = false; // CAMBIO
+            let isStudyMode = false;
+            let isReviewingEpigrafe = false;
             
             // --- INICIALIZACIÓN ---
 
@@ -490,7 +492,7 @@
                 speedDownBtn.addEventListener('click', decreaseSpeed);
                 loopBtn.addEventListener('click', toggleLoop);
                 voiceSelect.addEventListener('change', handleVoiceChange);
-                studyModeBtn.addEventListener('click', toggleStudyMode); // CAMBIO
+                studyModeBtn.addEventListener('click', toggleStudyMode);
                 
                 fontSizeSelect.addEventListener('change', applyFontSize);
                 toggleTextDisplaySizeBtn.addEventListener('click', toggleFullscreen);
@@ -531,7 +533,6 @@
                 panel.classList.toggle('hidden');
             }
 
-            // CAMBIO: Nueva función para el modo estudio
             function toggleStudyMode() {
                 if (studyModeBtn.disabled) return;
                 isStudyMode = !isStudyMode;
@@ -667,7 +668,6 @@
                 }, 200);
             }
             
-            // CAMBIO: Lógica de selección por defecto y llamada a prepareAndDisplayText
             function updateEpigrafeList() {
                 stopReadingInternal(true);
                 
@@ -738,7 +738,6 @@
                 }
             }
 
-            // CAMBIO: Añadido epigrafeIndex a los párrafos
             function prepareAndDisplayText(selectionChanged = false) {
                 const wasPlaying = isSpeaking && !isPaused;
                 if (selectionChanged) {
@@ -790,6 +789,7 @@
                 }
             }
 
+            // CAMBIO: Se ha corregido la lógica de play/pausa
             function handlePlayPause() {
                 if (!voicesReady){
                     readerStatus.textContent = "Las voces del navegador aún no están listas. Intentando de nuevo...";
@@ -799,7 +799,6 @@
                 
                 if (speechSynthesis.speaking && !isPaused) {
                     speechSynthesis.pause();
-                    updateUIState('paused'); 
                 } else if (isPaused) {
                     speechSynthesis.resume();
                 } else {
@@ -810,7 +809,7 @@
             function stopReadingInternal(resetIndex = false) {
                 log('stopReadingInternal llamado. reseteando índice:', resetIndex);
                 stopRequested = true;
-                isReviewingEpigrafe = false; // CAMBIO
+                isReviewingEpigrafe = false;
                 speechSynthesis.cancel();
                 
                 if(resetIndex){
@@ -923,7 +922,7 @@
                 }
                 currentParagraphIndex = parseInt(paragraphSelect.value, 10) || 0;
                 currentRepetition = 0;
-                isReviewingEpigrafe = false; // CAMBIO
+                isReviewingEpigrafe = false;
                 playCurrentParagraph();
             }
 
@@ -976,7 +975,6 @@
                 };
                 utterance.onboundary = handleWordBoundary;
 
-                // CAMBIO: Lógica de onend completamente nueva para Modo Estudio
                 utterance.onend = () => {
                     releaseWakeLock();
                     if (seekInProgress) return;
@@ -1087,7 +1085,7 @@
                     speechSynthesis.cancel();
                     currentParagraphIndex = newIndex;
                     currentRepetition = 0;
-                    isReviewingEpigrafe = false; // CAMBIO
+                    isReviewingEpigrafe = false;
                     setTimeout(() => {
                         seekInProgress = false;
                         playCurrentParagraph();
@@ -1218,7 +1216,7 @@
                  isPaused = false;
                  stopRequested = false;
                  seekInProgress = false;
-                 isReviewingEpigrafe = false; // CAMBIO
+                 isReviewingEpigrafe = false;
                  if (lastHighlightedSpan) lastHighlightedSpan.classList.remove('highlight');
                  if (lastHighlightedParagraph) lastHighlightedParagraph.classList.remove('paragraph-highlight');
                  lastHighlightedSpan = null;
@@ -1227,7 +1225,6 @@
                  updateUIState('idle');
             }
 
-            // CAMBIO: Actualizar estado del botón de modo estudio
             function updateUIState(state) {
                  isSpeaking = (state === 'speaking' || state === 'paused');
                  isPaused = (state === 'paused');
